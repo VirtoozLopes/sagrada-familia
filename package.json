@@ -1,0 +1,42 @@
+{
+  "name": "pecas-order-system",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.97",
+    "@prisma/client": "^5.10.2",
+    "@vercel/blob": "^2.3.3",
+    "clsx": "^2.1.0",
+    "framer-motion": "^11.0.8",
+    "jimp": "^1.6.1",
+    "lucide-react": "^0.344.0",
+    "next": "14.1.0",
+    "nodemailer": "^6.9.10",
+    "pdf-lib": "^1.17.1",
+    "pdf2json": "^4.0.2",
+    "pdfjs-dist": "^4.10.38",
+    "prisma": "^5.10.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-pdf": "^7.7.1",
+    "tailwind-merge": "^2.2.1",
+    "xlsx": "^0.18.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/nodemailer": "^6.4.14",
+    "@types/react": "^18.2.61",
+    "@types/react-dom": "^18.2.19",
+    "autoprefixer": "^10.4.18",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3"
+  }
+}

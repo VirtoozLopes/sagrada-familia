@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# production
+.next/
+out/
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# database
+prisma/dev.db
+prisma/*.db
+tmp/
+
+# debug
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# testing
+test-*.js
