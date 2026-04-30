@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface CartItem {
   id: string;
+  cartItemId?: string;
   code: string;
   name: string;
   price?: number;
@@ -17,20 +18,24 @@ interface CartProps {
   items: CartItem[];
   onUpdateQuantity: (id: string, delta: number) => void;
   onRemove: (id: string) => void;
-  onSubmit: (customer: any, useWhatsapp: boolean) => void;
+  onClear?: () => void;
+  onSubmit: (customer: any, useWhatsapp: boolean, targetNumber?: string) => void;
+  whatsappContacts?: {id: string, name: string, number: string}[];
 }
 
-export default function Cart({ items, onUpdateQuantity, onRemove, onSubmit }: CartProps) {
+export default function Cart({ items, onUpdateQuantity, onRemove, onClear, onSubmit, whatsappContacts = [] }: CartProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<'review' | 'checkout'>('review');
   const [submitType, setSubmitType] = useState<'whatsapp' | 'email'>('whatsapp');
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '' });
+  const [selectedWhatsappId, setSelectedWhatsappId] = useState(whatsappContacts[0]?.id || '');
 
   const total = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(customer, submitType === 'whatsapp');
+    const targetNumber = whatsappContacts.find(c => c.id === selectedWhatsappId)?.number || whatsappContacts[0]?.number;
+    onSubmit(customer, submitType === 'whatsapp', targetNumber);
     setStep('review');
     setIsOpen(false);
   };
@@ -97,7 +102,7 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onSubmit }: Ca
                 ) : step === 'review' ? (
                   <div className="space-y-4">
                     {items.map((item) => (
-                      <div key={item.id} className="bg-white rounded-[2rem] p-5 border border-stone-100 shadow-sm flex flex-col gap-4">
+                      <div key={item.cartItemId || item.id} className="bg-white rounded-[2rem] p-5 border border-stone-100 shadow-sm flex flex-col gap-4">
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{item.code}</div>
@@ -109,7 +114,7 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onSubmit }: Ca
                             )}
                           </div>
                           <button
-                            onClick={() => onRemove(item.id)}
+                            onClick={() => onRemove(item.cartItemId || item.id)}
                             className="text-stone-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-full transition-all"
                           >
                             <Trash2 size={18} />
@@ -118,7 +123,7 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onSubmit }: Ca
                         <div className="flex items-center justify-between">
                           <div className="flex items-center bg-stone-50 rounded-2xl p-1 border border-stone-100">
                             <button
-                              onClick={() => onUpdateQuantity(item.id, -1)}
+                              onClick={() => onUpdateQuantity(item.cartItemId || item.id, -1)}
                               className="p-1.5 text-stone-400 hover:text-primary disabled:opacity-30"
                               disabled={item.quantity <= 1}
                             >
@@ -126,7 +131,7 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onSubmit }: Ca
                             </button>
                             <span className="px-5 text-stone-800 font-black text-sm min-w-[40px] text-center">{item.quantity}</span>
                             <button
-                              onClick={() => onUpdateQuantity(item.id, 1)}
+                              onClick={() => onUpdateQuantity(item.cartItemId || item.id, 1)}
                               className="p-1.5 text-stone-400 hover:text-primary"
                             >
                               <Plus size={16} />
@@ -163,6 +168,23 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onSubmit }: Ca
                         placeholder="(00) 00000-0000"
                       />
                     </div>
+
+                    {whatsappContacts.length > 1 && (
+                      <div className="space-y-3">
+                        <label className="text-[11px] font-black text-stone-900 uppercase tracking-widest ml-1">Enviar pedido para (Vendedor)</label>
+                        <select
+                          required
+                          value={selectedWhatsappId}
+                          onChange={(e) => setSelectedWhatsappId(e.target.value)}
+                          className="w-full bg-white border border-stone-200 rounded-2xl py-4 px-5 text-stone-800 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold appearance-none cursor-pointer"
+                        >
+                          <option value="" disabled>Selecione um vendedor...</option>
+                          {whatsappContacts.map(contact => (
+                            <option key={contact.id} value={contact.id}>{contact.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </form>
                 )}
               </div>
@@ -175,13 +197,26 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onSubmit }: Ca
                   </div>
                   
                   {step === 'review' ? (
-                    <button
-                      onClick={() => setStep('checkout')}
-                      className="w-full bg-primary hover:bg-stone-800 text-white font-black uppercase text-xs tracking-[0.2em] py-5 rounded-[2rem] shadow-xl shadow-primary/20 flex items-center justify-center gap-3 transition-all active:scale-95 border-b-4 border-black/10"
-                    >
-                      <FileText size={18} />
-                      Próximo Passo
-                    </button>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => setStep('checkout')}
+                        className="w-full bg-primary hover:bg-stone-800 text-white font-black uppercase text-xs tracking-[0.2em] py-5 rounded-[2rem] shadow-xl shadow-primary/20 flex items-center justify-center gap-3 transition-all active:scale-95 border-b-4 border-black/10"
+                      >
+                        <FileText size={18} />
+                        Próximo Passo
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm('Tem certeza que deseja esvaziar o carrinho?')) {
+                            onClear?.();
+                          }
+                        }}
+                        className="w-full text-stone-400 hover:text-red-500 font-bold transition-all py-2 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
+                      >
+                        <Trash2 size={14} />
+                        Limpar carrinho
+                      </button>
+                    </div>
                   ) : (
                     <div className="flex flex-col gap-3">
                       <button

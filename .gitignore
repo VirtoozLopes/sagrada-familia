@@ -26,3 +26,5 @@ Thumbs.db
 
 # testing
 test-*.js
+
+.vercel

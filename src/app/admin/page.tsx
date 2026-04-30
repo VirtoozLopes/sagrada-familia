@@ -1,16 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, AlertCircle, Loader2, Image as ImageIcon, Search, LayoutDashboard, Database, FolderHeart, Sparkles, Trash2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, AlertCircle, Loader2, Image as ImageIcon, Search, LayoutDashboard, Database, FolderHeart, Sparkles, Trash2, Lock, LogOut, Pencil, X, PackageCheck, TrendingDown, BarChart3, Save, RefreshCw, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { processPdfAction, scanLocalCatalogAction } from '@/app/actions/pdf';
-import { getAllProductsAction, uploadProductImageAction, createManualProductAction, deleteProductsAction } from '@/app/actions/product';
-import { getWhatsAppNumberAction, saveWhatsAppNumberAction } from '@/app/actions/settings';
+import { getAllProductsAction, uploadProductImageAction, createManualProductAction, deleteProductsAction, updateProductAction } from '@/app/actions/product';
+import { getWhatsAppNumbersAction, saveWhatsAppNumbersAction } from '@/app/actions/settings';
+import { changePasswordAction, logoutAction } from '@/app/actions/auth';
 
 interface Product {
   id: string;
   code: string;
   name: string;
+  price: number | null;
+  description: string | null;
   imageUrl: string | null;
   categoryId: string | null;
 }
@@ -25,7 +28,7 @@ export default function AdminPage() {
   const [pdfStatus, setPdfStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'import' | 'catalog' | 'categories'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'import' | 'catalog' | 'categories' | 'estoque'>('dashboard');
 
   // Categories State
   const [categories, setCategories] = useState<Category[]>([]);
@@ -56,20 +59,52 @@ export default function AdminPage() {
   const [isCreatingManualProduct, setIsCreatingManualProduct] = useState(false);
 
   // WhatsApp Settings State
-  const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [whatsappInput, setWhatsappInput] = useState('');
+  const [whatsappContacts, setWhatsappContacts] = useState<{id: string, name: string, number: string}[]>([]);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactNumber, setNewContactNumber] = useState('');
   const [isSavingWhatsapp, setIsSavingWhatsapp] = useState(false);
   const [whatsappSaved, setWhatsappSaved] = useState(false);
+
+  // Password Change State
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState('');
+
+  // Edit Product State
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  // Inventory / Stock State
+  interface StockProduct { id: string; code: string; name: string; stock: number | null; editStock: number; dirty: boolean; }
+  const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
+  const [stockSearch, setStockSearch] = useState('');
+  const [isSavingStock, setIsSavingStock] = useState(false);
+  const [stockSaveMsg, setStockSaveMsg] = useState('');
+  const [isLoadingStock, setIsLoadingStock] = useState(false);
+
+  // Daily Report State
+  const todayStr = () => new Date().toISOString().split('T')[0];
+  const [reportDate, setReportDate] = useState(todayStr());
+  const [reportPeriod, setReportPeriod] = useState<'daily' | 'weekly'>('daily');
+  const [reportData, setReportData] = useState<any>(null);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [isDeletingItem, setIsDeletingItem] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
     fetchProducts();
     fetchCategories();
-    // Load WhatsApp number
-    getWhatsAppNumberAction().then(res => {
-      if (res.whatsappNumber) {
-        setWhatsappNumber(res.whatsappNumber);
-        setWhatsappInput(res.whatsappNumber);
+    // Load WhatsApp configuration
+    getWhatsAppNumbersAction().then(res => {
+      if (res.whatsappNumbers) {
+        setWhatsappContacts(res.whatsappNumbers);
       }
     });
   }, []);
@@ -174,6 +209,209 @@ export default function AdminPage() {
     setIsLoadingProducts(false);
   };
 
+  const fetchStock = async () => {
+    setIsLoadingStock(true);
+    try {
+      const res = await fetch('/api/stock');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setStockProducts(data.map((p: any) => ({
+          id: p.id,
+          code: p.code,
+          name: p.name,
+          stock: p.stock ?? 0,
+          editStock: p.stock ?? 0,
+          dirty: false,
+        })));
+      }
+    } catch (e) { /* silent */ }
+    setIsLoadingStock(false);
+  };
+
+  const handleStockChange = (id: string, value: string) => {
+    setStockProducts(prev => prev.map(p =>
+      p.id === id ? { ...p, editStock: parseInt(value) || 0, dirty: true } : p
+    ));
+  };
+
+  const handleSaveStock = async () => {
+    const dirty = stockProducts.filter(p => p.dirty);
+    if (!dirty.length) return;
+    setIsSavingStock(true);
+    setStockSaveMsg('');
+    try {
+      const res = await fetch('/api/stock', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dirty.map(p => ({ id: p.id, stock: p.editStock }))),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStockProducts(prev => prev.map(p => ({ ...p, stock: p.editStock, dirty: false })));
+        setStockSaveMsg(`✓ ${data.updated} produto(s) atualizados`);
+        setTimeout(() => setStockSaveMsg(''), 4000);
+      } else {
+        setStockSaveMsg('Erro ao salvar estoque.');
+      }
+    } catch {
+      setStockSaveMsg('Erro de conexão.');
+    }
+    setIsSavingStock(false);
+  };
+
+  const fetchDailyReport = async (date: string, period: string = reportPeriod) => {
+    setIsLoadingReport(true);
+    try {
+      const res = await fetch(`/api/reports/daily?date=${date}&period=${period}`);
+      const data = await res.json();
+      setReportData(data);
+    } catch {
+      setReportData(null);
+    }
+    setIsLoadingReport(false);
+  };
+
+  const handleDeleteReportItem = async (code: string) => {
+    if (!confirm(`Tem certeza que deseja apagar as vendas do item ${code} deste período?\nO estoque será devolvido automaticamente.`)) return;
+
+    setIsDeletingItem(code);
+    try {
+      const res = await fetch(`/api/reports/daily/item?date=${reportDate}&code=${code}&period=${reportPeriod}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        await fetchDailyReport(reportDate);
+        await fetchStock();
+      } else {
+        alert(data.error || 'Erro ao apagar item');
+      }
+    } catch (e) {
+      alert('Erro de conexão ao apagar item');
+    }
+    setIsDeletingItem(null);
+  };
+
+  const handlePrintReport = () => {
+    if (!reportData) return;
+
+    const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    const dateLabel = reportData.period === 'weekly'
+      ? `Semana de ${reportData.startDate.split('-').reverse().join('/')} a ${reportData.endDate.split('-').reverse().join('/')}`
+      : new Date(reportDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+      
+    const now = new Date().toLocaleString('pt-BR');
+
+    const rows = (reportData.items as any[]).map((item: any, i: number) => {
+      const outOfStock = item.currentStock !== null && Number(item.currentStock) < 0;
+      return `
+        <tr style="background:${outOfStock ? '#fff5f5' : i % 2 === 0 ? '#fafafa' : '#ffffff'}">
+          <td style="padding:9px 12px;font-weight:700;color:#7c3aed;font-size:11px;border-bottom:1px solid #f0f0f0">${item.code}</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0">
+            ${item.name}
+            ${outOfStock ? '<span style="margin-left:6px;padding:2px 7px;background:#fecaca;color:#dc2626;border-radius:999px;font-size:9px;font-weight:800">⚠ Sem estoque</span>' : ''}
+          </td>
+          <td style="padding:9px 12px;text-align:center;font-weight:800;color:#7c3aed;border-bottom:1px solid #f0f0f0">${Number(item.totalQuantity)}</td>
+          <td style="padding:9px 12px;text-align:center;color:#555;border-bottom:1px solid #f0f0f0">${item.avgPrice ? 'R$ ' + fmt(Number(item.avgPrice)) : '—'}</td>
+          <td style="padding:9px 12px;text-align:center;font-weight:700;border-bottom:1px solid #f0f0f0">${Number(item.totalValue) > 0 ? 'R$ ' + fmt(Number(item.totalValue)) : '—'}</td>
+          <td style="padding:9px 12px;text-align:center;font-weight:800;color:${Number(item.currentStock) < 0 ? '#dc2626' : Number(item.currentStock) === 0 ? '#d97706' : '#16a34a'};border-bottom:1px solid #f0f0f0">${item.currentStock !== null ? Number(item.currentStock) : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Relatório de Vendas – ${dateLabel}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1c1917; background: #fff; padding: 32px 40px; font-size: 13px; }
+    h1 { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; color: #1c1917; }
+    .subtitle { font-size: 11px; color: #78716c; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin-top: 4px; }
+    .meta { font-size: 11px; color: #a8a29e; margin-top: 2px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 2px solid #7c3aed; margin-bottom: 24px; }
+    .brand { font-size: 11px; font-weight: 800; color: #7c3aed; text-transform: uppercase; letter-spacing: 2px; }
+    .summary { display: flex; gap: 0; border: 1px solid #e7e5e4; border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+    .summary-card { flex: 1; text-align: center; padding: 16px 12px; border-right: 1px solid #e7e5e4; background: #faf9f8; }
+    .summary-card:last-child { border-right: none; }
+    .summary-card .val { font-size: 26px; font-weight: 900; }
+    .summary-card .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; color: #78716c; margin-top: 4px; }
+    .val-orders { color: #1c1917; }
+    .val-qty { color: #7c3aed; }
+    .val-rev { color: #16a34a; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead tr { background: #f5f0ff; }
+    th { padding: 10px 12px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 800; color: #7c3aed; border-bottom: 2px solid #e0d4ff; }
+    th.center { text-align: center; }
+    td { vertical-align: middle; }
+    .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e7e5e4; display: flex; justify-content: space-between; font-size: 10px; color: #a8a29e; }
+    @media print {
+      body { padding: 16px 20px; }
+      @page { margin: 15mm; size: A4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">Pecas Order System</div>
+      <h1>Relatório de Vendas</h1>
+      <div class="subtitle">${dateLabel}</div>
+      <div class="meta">Gerado em ${now}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:#78716c;font-weight:700">Total de Pedidos</div>
+      <div style="font-size:28px;font-weight:900;color:#1c1917">${Number(reportData.summary?.totalOrders ?? 0)}</div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="summary-card">
+      <div class="val val-orders">${Number(reportData.summary?.totalOrders ?? 0)}</div>
+      <div class="lbl">Pedidos</div>
+    </div>
+    <div class="summary-card">
+      <div class="val val-qty">${Number(reportData.summary?.totalItems ?? 0)}</div>
+      <div class="lbl">Peças Vendidas</div>
+    </div>
+    <div class="summary-card">
+      <div class="val val-rev">${Number(reportData.summary?.totalRevenue ?? 0) > 0 ? 'R$ ' + fmt(Number(reportData.summary.totalRevenue)) : '—'}</div>
+      <div class="lbl">Receita Total</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Nome da Peça</th>
+        <th class="center">Qtd Vendida</th>
+        <th class="center">Preço Unit.</th>
+        <th class="center">Subtotal</th>
+        <th class="center">Estoque Atual</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div class="footer">
+    <span>Pecas Order System – Relatório interno</span>
+    <span>${dateLabel} · ${now}</span>
+  </div>
+
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
+  };
+
   const handleToggleProductSelect = (id: string) => {
     setSelectedProductIds(prev => {
       const next = new Set(prev);
@@ -217,6 +455,38 @@ export default function AdminPage() {
 
   const handleDeleteProducts = (ids: string[]) => {
     setConfirmProductDeleteIds(ids);
+  };
+
+  const handleOpenEdit = (product: Product) => {
+    setEditingProduct(product);
+    setEditName(product.name);
+    setEditCode(product.code);
+    setEditPrice(product.price != null ? String(product.price) : '');
+    setEditDescription(product.description || '');
+    setEditError('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingProduct) return;
+    setIsSavingEdit(true);
+    setEditError('');
+    const result = await updateProductAction(editingProduct.id, {
+      name: editName,
+      code: editCode,
+      price: editPrice,
+      description: editDescription,
+    });
+    if (result.success) {
+      setProducts(prev => prev.map(p =>
+        p.id === editingProduct.id
+          ? { ...p, name: editName, code: editCode, price: editPrice ? parseFloat(editPrice) : null, description: editDescription }
+          : p
+      ));
+      setEditingProduct(null);
+    } else {
+      setEditError(result.error || 'Erro ao salvar.');
+    }
+    setIsSavingEdit(false);
   };
 
   const handleCreateManualProduct = async (e: React.FormEvent) => {
@@ -362,7 +632,8 @@ export default function AdminPage() {
             <p className="text-stone-500 mt-1">Gerencie seu inventário de artigos religiosos com facilidade.</p>
           </div>
           
-          <nav className="flex p-1.5 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-2xl shadow-sm">
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <nav className="flex p-1.5 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-2xl shadow-sm">
             <button 
               onClick={() => setActiveTab('dashboard')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
@@ -391,7 +662,25 @@ export default function AdminPage() {
               <Settings size={16} />
               Grupos
             </button>
-          </nav>
+            <button 
+              onClick={() => { setActiveTab('estoque'); fetchStock(); fetchDailyReport(reportDate); }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'estoque' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
+            >
+              <PackageCheck size={16} />
+              Estoque
+            </button>
+            </nav>
+            <button 
+              onClick={async () => {
+                await logoutAction();
+                window.location.href = '/admin/login';
+              }}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all bg-red-50 text-red-500 hover:bg-red-100 border border-red-100 shrink-0"
+            >
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
+          </div>
         </header>
 
         <AnimatePresence mode="wait">
@@ -449,7 +738,80 @@ export default function AdminPage() {
                     Dica: Para o Gmail funcionar, você deve gerar uma <strong className="text-stone-700">"Senha de App"</strong> nas configurações da sua conta Google.
                   </p>
                 </div>
-            </div>
+              </div>
+
+              {/* Security / Password Change */}
+              <div className="glass p-8 rounded-3xl border border-stone-200 bg-white">
+                <h2 className="text-xl font-black mb-2 flex items-center gap-3 text-stone-800 uppercase tracking-tight">
+                  <Lock size={20} className="text-stone-800" />
+                  Segurança e Acesso
+                </h2>
+                <p className="text-stone-400 text-xs mb-8 uppercase tracking-widest font-bold">Altere sua senha de acesso ao painel admin</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-3 ml-1">Senha Atual</label>
+                    <input 
+                      type="password" 
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-5 text-stone-800 outline-none focus:border-stone-400 transition-all font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-3 ml-1">Nova Senha</label>
+                    <input 
+                      type="password" 
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-5 text-stone-800 outline-none focus:border-stone-400 transition-all font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-3 ml-1">Confirmar Nova Senha</label>
+                    <input 
+                      type="password" 
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-5 text-stone-800 outline-none focus:border-stone-400 transition-all font-medium"
+                    />
+                  </div>
+                </div>
+
+                {passwordMessage && (
+                  <div className={`mt-4 p-3 rounded-xl text-xs font-bold ${passwordMessage.includes('sucesso') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                    {passwordMessage}
+                  </div>
+                )}
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                    onClick={async () => {
+                      if (newPassword !== confirmPassword) {
+                        setPasswordMessage('A nova senha e a confirmação não conferem.');
+                        return;
+                      }
+                      setIsChangingPassword(true);
+                      setPasswordMessage('');
+                      const res = await changePasswordAction(currentPassword, newPassword);
+                      if (res.success) {
+                        setPasswordMessage('Senha alterada com sucesso!');
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                      } else {
+                        setPasswordMessage(res.error || 'Erro ao alterar a senha.');
+                      }
+                      setIsChangingPassword(false);
+                    }}
+                    className="bg-stone-800 hover:bg-stone-900 disabled:opacity-50 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2"
+                  >
+                    {isChangingPassword ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+                    Alterar Senha
+                  </button>
+                </div>
+              </div>
 
             {/* WhatsApp Settings */}
             <div className="glass p-8 rounded-3xl border border-stone-200 bg-white">
@@ -457,25 +819,94 @@ export default function AdminPage() {
                 <span className="text-2xl">📱</span>
                 WhatsApp para Recebimento de Pedidos
               </h2>
-              <p className="text-stone-400 text-xs mb-8 uppercase tracking-widest font-bold">Configure o número que receberá os pedidos via WhatsApp</p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
-                  <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-3 ml-1">Número (com DDI e DDD, ex: 5511999999999)</label>
+              <p className="text-stone-400 text-xs mb-8 uppercase tracking-widest font-bold">Adicione os vendedores que poderão receber pedidos</p>
+              
+              <div className="space-y-4 mb-6">
+                {whatsappContacts.map((contact, index) => (
+                  <div key={contact.id} className="flex flex-col lg:flex-row gap-4 lg:items-center bg-stone-50 p-5 rounded-2xl border border-stone-100">
+                    <div className="flex-1 w-full">
+                      <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5 ml-1">Nome do Contato</label>
+                      <input
+                        type="text"
+                        value={contact.name}
+                        onChange={e => {
+                          const newContacts = [...whatsappContacts];
+                          newContacts[index].name = e.target.value;
+                          setWhatsappContacts(newContacts);
+                        }}
+                        className="w-full bg-white border border-stone-200 rounded-xl py-3 px-4 text-stone-800 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 text-sm font-bold transition-all"
+                      />
+                    </div>
+                    <div className="flex-1 w-full">
+                      <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5 ml-1">Número (ex: 5511...)</label>
+                      <input
+                        type="tel"
+                        value={contact.number}
+                        onChange={e => {
+                          const newContacts = [...whatsappContacts];
+                          newContacts[index].number = e.target.value;
+                          setWhatsappContacts(newContacts);
+                        }}
+                        className="w-full bg-white border border-stone-200 rounded-xl py-3 px-4 text-stone-800 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 text-sm font-mono transition-all"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newContacts = whatsappContacts.filter((_, i) => i !== index);
+                        setWhatsappContacts(newContacts);
+                      }}
+                      className="lg:mt-5 p-3 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-all flex items-center justify-center gap-2 w-full lg:w-auto mt-2 shadow-sm shrink-0"
+                    >
+                      <Trash2 size={18} />
+                      <span className="lg:hidden text-xs font-black uppercase tracking-widest">Remover Contato</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col lg:flex-row gap-4 lg:items-end p-6 bg-green-50/50 rounded-3xl border border-green-100">
+                <div className="flex-1 w-full">
+                  <label className="block text-[10px] font-black text-green-700 uppercase tracking-widest mb-2 ml-1">Novo Nome (Ex: Filial Centro)</label>
                   <input
-                    type="tel"
-                    value={whatsappInput}
-                    onChange={e => setWhatsappInput(e.target.value)}
-                    placeholder="5511999999999"
-                    className="w-full bg-white border border-stone-200 rounded-2xl py-4 px-5 text-stone-800 outline-none focus:border-green-400 focus:ring-4 focus:ring-green-400/10 transition-all font-medium placeholder:text-stone-300"
+                    type="text"
+                    value={newContactName}
+                    onChange={e => setNewContactName(e.target.value)}
+                    placeholder="Nome do Vendedor"
+                    className="w-full bg-white border border-green-200 rounded-2xl py-3 px-5 text-stone-800 outline-none focus:border-green-400 focus:ring-4 focus:ring-green-400/10 transition-all font-medium placeholder:text-stone-300"
                   />
                 </div>
+                <div className="flex-1 w-full">
+                  <label className="block text-[10px] font-black text-green-700 uppercase tracking-widest mb-2 ml-1">Novo Número (5511999999999)</label>
+                  <input
+                    type="tel"
+                    value={newContactNumber}
+                    onChange={e => setNewContactNumber(e.target.value)}
+                    placeholder="5511999999999"
+                    className="w-full bg-white border border-green-200 rounded-2xl py-3 px-5 text-stone-800 outline-none focus:border-green-400 focus:ring-4 focus:ring-green-400/10 transition-all font-medium placeholder:text-stone-300"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (newContactName.trim() && newContactNumber.trim()) {
+                      setWhatsappContacts([...whatsappContacts, { id: crypto.randomUUID(), name: newContactName, number: newContactNumber }]);
+                      setNewContactName('');
+                      setNewContactNumber('');
+                    }
+                  }}
+                  className="bg-green-600 hover:bg-green-700 text-white shadow-lg w-full lg:w-auto px-8 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all mt-4 lg:mt-0 flex items-center justify-center whitespace-nowrap shrink-0"
+                >
+                  Adicionar
+                </button>
+              </div>
+
+              <div className="mt-6 flex justify-end">
                 <button
                   onClick={async () => {
                     setIsSavingWhatsapp(true);
                     setWhatsappSaved(false);
-                    const result = await saveWhatsAppNumberAction(whatsappInput);
-                    if (result.success) {
-                      setWhatsappNumber(result.whatsappNumber || '');
+                    const result = await saveWhatsAppNumbersAction(whatsappContacts);
+                    if (result.success && result.whatsappNumbers) {
+                      setWhatsappContacts(result.whatsappNumbers);
                       setWhatsappSaved(true);
                       setTimeout(() => setWhatsappSaved(false), 3000);
                     } else {
@@ -484,20 +915,16 @@ export default function AdminPage() {
                     setIsSavingWhatsapp(false);
                   }}
                   disabled={isSavingWhatsapp}
-                  className="self-end bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black uppercase text-xs tracking-widest px-8 py-4 rounded-2xl shadow-lg shadow-green-600/20 flex items-center gap-2 transition-all whitespace-nowrap"
+                  className="bg-primary hover:bg-stone-800 disabled:opacity-50 text-white font-black uppercase text-xs tracking-widest px-8 py-4 rounded-2xl shadow-lg flex items-center gap-2 transition-all whitespace-nowrap"
                 >
                   {isSavingWhatsapp ? <Loader2 size={16} className="animate-spin" /> : whatsappSaved ? <CheckCircle2 size={16} /> : '💾'}
-                  {whatsappSaved ? 'Salvo!' : 'Salvar'}
+                  {whatsappSaved ? 'Lista Salva!' : 'Salvar Lista de Vendedores'}
                 </button>
               </div>
-              {whatsappNumber && (
-                <div className="mt-4 text-xs text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3 font-bold flex items-center gap-2">
-                  <CheckCircle2 size={14} /> Número ativo: +{whatsappNumber}
-                </div>
-              )}
-              {!whatsappNumber && (
-                <div className="mt-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 font-bold flex items-center gap-2">
-                  ⚠️ Sem número configurado — clientes só poderão usar a opção de E-mail.
+
+              {whatsappContacts.length === 0 && (
+                <div className="mt-8 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 font-bold flex items-center gap-2">
+                  ⚠️ Nenhum contato configurado — clientes não verão a opção "Enviar via WhatsApp".
                 </div>
               )}
             </div>
@@ -807,13 +1234,21 @@ export default function AdminPage() {
                             className="w-5 h-5 rounded border-stone-300 text-primary focus:ring-primary/20 shadow-xl cursor-pointer" 
                           />
                         </div>
-                        <button 
-                          onClick={() => handleDeleteProducts([product.id])} 
-                          disabled={isDeletingSelected}
-                          className="absolute top-7 right-7 z-10 p-2 bg-white/90 hover:bg-red-50 text-stone-400 hover:text-red-500 rounded-xl backdrop-blur-sm shadow-xl transition-all border border-stone-100 opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-0"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="absolute top-7 right-7 z-10 flex gap-1.5">
+                          <button 
+                            onClick={() => handleOpenEdit(product as any)} 
+                            className="p-2 bg-white/90 hover:bg-primary/10 text-stone-400 hover:text-primary rounded-xl backdrop-blur-sm shadow-xl transition-all border border-stone-100 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteProducts([product.id])} 
+                            disabled={isDeletingSelected}
+                            className="p-2 bg-white/90 hover:bg-red-50 text-stone-400 hover:text-red-500 rounded-xl backdrop-blur-sm shadow-xl transition-all border border-stone-100 opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-0"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
 
                         <div className="relative aspect-square bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center border border-stone-100/50 mt-2">
                           {product.imageUrl ? (
@@ -849,8 +1284,13 @@ export default function AdminPage() {
                             className="w-full bg-stone-50 border border-stone-200 rounded-xl py-2 px-3 text-[10px] font-bold text-stone-600 outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer uppercase tracking-tight"
                           >
                             <option value="none">Sem Grupo</option>
-                            {categories.map(cat => (
-                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            {categories.map((cat: any) => (
+                              <optgroup key={cat.id} label={cat.name}>
+                                <option value={cat.id}>{cat.name} (Geral)</option>
+                                {cat.children?.map((child: any) => (
+                                  <option key={child.id} value={child.id}>- {child.name}</option>
+                                ))}
+                              </optgroup>
                             ))}
                           </select>
                         </div>
@@ -880,6 +1320,409 @@ export default function AdminPage() {
                   <p className="text-slate-500 font-bold">Nenhum produto encontrado.</p>
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {/* Edit Product Modal */}
+          <AnimatePresence>
+            {editingProduct && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm"
+                  onClick={() => !isSavingEdit && setEditingProduct(null)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className="bg-white rounded-3xl shadow-2xl relative z-10 w-full max-w-lg border border-stone-100 overflow-hidden"
+                >
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-stone-100">
+                    <div>
+                      <h3 className="text-xl font-black text-stone-800">Editar Produto</h3>
+                      <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-0.5">{editingProduct.code}</p>
+                    </div>
+                    <button onClick={() => setEditingProduct(null)} className="p-2 hover:bg-stone-100 rounded-xl text-stone-400 transition-all">
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Modal Body */}
+                  <div className="px-8 py-6 space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2 ml-1">Código / SKU *</label>
+                        <input
+                          type="text"
+                          value={editCode}
+                          onChange={e => setEditCode(e.target.value)}
+                          className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-stone-800 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold transition-all uppercase"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2 ml-1">Preço (R$)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editPrice}
+                          onChange={e => setEditPrice(e.target.value)}
+                          placeholder="0,00"
+                          className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-stone-800 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2 ml-1">Nome da Peça *</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-stone-800 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2 ml-1">Descrição</label>
+                      <textarea
+                        value={editDescription}
+                        onChange={e => setEditDescription(e.target.value)}
+                        rows={3}
+                        placeholder="Descrição opcional do produto..."
+                        className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-stone-800 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-medium transition-all resize-none"
+                      />
+                    </div>
+
+                    {editError && (
+                      <div className="flex items-center gap-2 text-red-500 bg-red-50 px-4 py-3 rounded-xl text-xs font-bold">
+                        <AlertCircle size={14} />
+                        {editError}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="flex gap-3 px-8 pb-8">
+                    <button
+                      onClick={() => setEditingProduct(null)}
+                      disabled={isSavingEdit}
+                      className="flex-1 py-3.5 rounded-2xl font-black text-stone-500 bg-stone-100 hover:bg-stone-200 transition-all text-sm uppercase tracking-widest"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={isSavingEdit || !editName || !editCode}
+                      className="flex-1 py-3.5 rounded-2xl font-black text-white bg-primary hover:bg-primary/90 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isSavingEdit ? <Loader2 size={16} className="animate-spin" /> : <Pencil size={16} />}
+                      Salvar
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* ─── ESTOQUE TAB ─────────────────────────────────────────── */}
+          {activeTab === 'estoque' && (
+            <motion.div
+              key="estoque"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-10"
+            >
+              {/* ── Inventory Control Panel ── */}
+              <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-8 py-6 border-b border-stone-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center">
+                      <PackageCheck size={20} className="text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-black text-stone-800 uppercase tracking-tight">Controle de Estoque</h2>
+                      <p className="text-xs text-stone-400 font-medium">Edite as quantidades e clique em Salvar</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    {/* Search */}
+                    <div className="relative flex-1 sm:flex-none">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={15} />
+                      <input
+                        type="text"
+                        placeholder="Buscar..."
+                        value={stockSearch}
+                        onChange={e => setStockSearch(e.target.value)}
+                        className="bg-stone-50 border border-stone-200 rounded-xl py-2.5 pl-9 pr-4 w-full sm:w-56 outline-none focus:border-primary text-sm font-medium transition-all"
+                      />
+                    </div>
+                    <button
+                      onClick={fetchStock}
+                      className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 text-stone-500 hover:text-primary hover:border-primary/30 transition-all"
+                      title="Recarregar"
+                    >
+                      <RefreshCw size={16} />
+                    </button>
+                    <button
+                      onClick={handleSaveStock}
+                      disabled={isSavingStock || !stockProducts.some(p => p.dirty)}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary/90 disabled:opacity-40 transition-all shadow-lg shadow-primary/20"
+                    >
+                      {isSavingStock ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      Salvar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Save message */}
+                {stockSaveMsg && (
+                  <div className={`px-8 py-3 text-xs font-bold flex items-center gap-2 ${stockSaveMsg.startsWith('✓') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                    {stockSaveMsg.startsWith('✓') ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                    {stockSaveMsg}
+                  </div>
+                )}
+
+                {/* Table */}
+                {isLoadingStock ? (
+                  <div className="flex items-center justify-center py-20 gap-3 text-stone-400">
+                    <Loader2 size={24} className="animate-spin" />
+                    <span className="text-sm font-bold">Carregando estoque...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-stone-100 bg-stone-50/60">
+                          <th className="text-left py-3 px-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Código</th>
+                          <th className="text-left py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Nome</th>
+                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest w-28">Estoque</th>
+                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest w-20">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-50">
+                        {stockProducts
+                          .filter(p =>
+                            !stockSearch ||
+                            p.code.toLowerCase().includes(stockSearch.toLowerCase()) ||
+                            p.name.toLowerCase().includes(stockSearch.toLowerCase())
+                          )
+                          .map(p => {
+                            const isLow = p.editStock <= 3 && p.editStock > 0;
+                            const isOut = p.editStock <= 0;
+                            return (
+                              <tr key={p.id} className={`transition-colors ${p.dirty ? 'bg-amber-50/50' : 'hover:bg-stone-50/60'}`}>
+                                <td className="py-3 px-6">
+                                  <span className="font-black text-primary text-[11px] uppercase tracking-wider">{p.code}</span>
+                                </td>
+                                <td className="py-3 px-4 font-medium text-stone-700 max-w-xs truncate">{p.name}</td>
+                                <td className="py-3 px-4 text-center">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={p.editStock}
+                                    onChange={e => handleStockChange(p.id, e.target.value)}
+                                    className={`w-20 text-center border rounded-xl py-1.5 px-2 font-black text-sm outline-none transition-all focus:ring-4 ${
+                                      p.dirty
+                                        ? 'border-amber-400 bg-amber-50 text-amber-700 focus:ring-amber-100'
+                                        : 'border-stone-200 bg-stone-50 text-stone-800 focus:border-primary focus:ring-primary/10'
+                                    }`}
+                                  />
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {isOut ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-600 rounded-full text-[10px] font-black uppercase tracking-wide">
+                                      <TrendingDown size={10} /> Esgotado
+                                    </span>
+                                  ) : isLow ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-wide">
+                                      Baixo
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-black uppercase tracking-wide">
+                                      OK
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                    {stockProducts.filter(p =>
+                      !stockSearch ||
+                      p.code.toLowerCase().includes(stockSearch.toLowerCase()) ||
+                      p.name.toLowerCase().includes(stockSearch.toLowerCase())
+                    ).length === 0 && (
+                      <div className="text-center py-12 text-stone-400 text-sm font-bold">
+                        Nenhum produto encontrado.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Daily Report Panel ── */}
+              <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-8 py-6 border-b border-stone-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-500/10 rounded-2xl flex items-center justify-center">
+                      <BarChart3 size={20} className="text-green-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-black text-stone-800 uppercase tracking-tight">Relatório de Vendas</h2>
+                      <p className="text-xs text-stone-400 font-medium">
+                        {reportData?.period === 'weekly' && reportData?.startDate 
+                          ? `Semana de ${reportData.startDate.split('-').reverse().join('/')} a ${reportData.endDate.split('-').reverse().join('/')}`
+                          : 'Pedidos recebidos no dia selecionado'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="flex items-center gap-1 bg-stone-100 border border-stone-200 rounded-xl p-1">
+                      <button
+                        onClick={() => { setReportPeriod('daily'); fetchDailyReport(reportDate, 'daily'); }}
+                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${reportPeriod === 'daily' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                      >
+                        Diário
+                      </button>
+                      <button
+                        onClick={() => { setReportPeriod('weekly'); fetchDailyReport(reportDate, 'weekly'); }}
+                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${reportPeriod === 'weekly' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                      >
+                        Semanal
+                      </button>
+                    </div>
+                    <input
+                      type="date"
+                      value={reportDate}
+                      max={todayStr()}
+                      onChange={e => { setReportDate(e.target.value); fetchDailyReport(e.target.value, reportPeriod); }}
+                      className="bg-stone-50 border border-stone-200 rounded-xl py-2.5 px-4 text-sm font-bold text-stone-700 outline-none focus:border-primary transition-all cursor-pointer"
+                    />
+                    <button
+                      onClick={() => fetchDailyReport(reportDate)}
+                      className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 text-stone-500 hover:text-green-600 hover:border-green-300 transition-all"
+                      title="Atualizar"
+                    >
+                      <RefreshCw size={16} />
+                    </button>
+                    <button
+                      onClick={handlePrintReport}
+                      disabled={!reportData || reportData.items?.length === 0}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-green-600/20"
+                      title="Exportar PDF / Imprimir"
+                    >
+                      <Printer size={15} />
+                      <span className="hidden sm:inline">Exportar PDF</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Summary cards */}
+                {reportData && (
+                  <div className="grid grid-cols-3 gap-4 px-8 py-5 border-b border-stone-100 bg-stone-50/40">
+                    <div className="text-center">
+                      <div className="text-2xl font-black text-stone-800">{Number(reportData.summary?.totalOrders ?? 0)}</div>
+                      <div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Pedidos</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-black text-primary">{Number(reportData.summary?.totalItems ?? 0)}</div>
+                      <div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Peças Vendidas</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-black text-green-600">
+                        {Number(reportData.summary?.totalRevenue ?? 0) > 0
+                          ? `R$ ${Number(reportData.summary.totalRevenue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : '—'}
+                      </div>
+                      <div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Receita Total</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Report table */}
+                {isLoadingReport ? (
+                  <div className="flex items-center justify-center py-16 gap-3 text-stone-400">
+                    <Loader2 size={24} className="animate-spin" />
+                    <span className="text-sm font-bold">Carregando relatório...</span>
+                  </div>
+                ) : !reportData || reportData.items?.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-stone-400 gap-3">
+                    <BarChart3 size={48} strokeWidth={1} className="opacity-30" />
+                    <p className="text-sm font-bold">Nenhum pedido registrado nesta data.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-stone-100 bg-stone-50/60">
+                          <th className="text-left py-3 px-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Código</th>
+                          <th className="text-left py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Nome</th>
+                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Qtd Vendida</th>
+                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Preço Unit.</th>
+                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Subtotal</th>
+                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Estoque Atual</th>
+                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-50">
+                        {(reportData.items as any[]).map((item: any, idx: number) => {
+                          const outOfStock = item.currentStock !== null && Number(item.currentStock) < 0;
+                          return (
+                            <tr key={idx} className={`transition-colors hover:bg-stone-50/60 ${outOfStock ? 'bg-red-50/30' : ''}`}>
+                              <td className="py-3 px-6">
+                                <span className="font-black text-primary text-[11px] uppercase tracking-wider">{item.code}</span>
+                              </td>
+                              <td className="py-3 px-4 font-medium text-stone-700 max-w-xs">
+                                <div className="flex items-center gap-2">
+                                  {item.name}
+                                  {outOfStock && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap">
+                                      <TrendingDown size={9} /> Sem estoque
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span className="inline-block px-3 py-1 bg-primary/10 text-primary font-black rounded-full text-xs">
+                                  {Number(item.totalQuantity)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center text-stone-500 font-medium">
+                                {item.avgPrice ? `R$ ${Number(item.avgPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
+                              </td>
+                              <td className="py-3 px-4 text-center font-bold text-stone-800">
+                                {Number(item.totalValue) > 0 ? `R$ ${Number(item.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {item.currentStock !== null ? (
+                                  <span className={`font-black text-sm ${Number(item.currentStock) < 0 ? 'text-red-500' : Number(item.currentStock) === 0 ? 'text-amber-500' : 'text-green-600'}`}>
+                                    {Number(item.currentStock)}
+                                  </span>
+                                ) : <span className="text-stone-300">—</span>}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <button
+                                  onClick={() => handleDeleteReportItem(item.code)}
+                                  disabled={isDeletingItem === item.code}
+                                  className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                  title="Apagar vendas deste item"
+                                >
+                                  {isDeletingItem === item.code ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
 

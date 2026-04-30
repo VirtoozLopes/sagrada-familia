@@ -11,10 +11,13 @@
   "dependencies": {
     "@napi-rs/canvas": "^0.1.97",
     "@prisma/client": "^5.10.2",
+    "@types/bcryptjs": "^2.4.6",
     "@vercel/blob": "^2.3.3",
+    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.8",
     "jimp": "^1.6.1",
+    "jose": "^6.2.2",
     "lucide-react": "^0.344.0",
     "next": "14.1.0",
     "nodemailer": "^6.9.10",
@@ -38,5 +41,8 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3"
+  },
+  "overrides": {
+    "undici": "5.28.4"
   }
 }

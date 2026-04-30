@@ -43,23 +43,27 @@ export async function sendOrderEmails(customerInfo: any, items: any[], pdfBuffer
     ] : []
   };
 
-  // Send to Admin
-  await transporter.sendMail(mailOptionsAdmin);
+  try {
+    // Send to Admin
+    await transporter.sendMail(mailOptionsAdmin);
 
-  // Send confirmation to Customer if email provided
-  if (customerEmail) {
-    const mailOptionsCustomer = {
-      from: process.env.GMAIL_USER,
-      to: customerEmail,
-      subject: `Confirmação de Pedido - Loja de Peças`,
-      text: `Olá ${customerInfo.name}, recebemos seu pedido! Segue em anexo o resumo em PDF.`,
-      attachments: pdfBuffer ? [
-        {
-          filename: `Pedido_Resumo.pdf`,
-          content: pdfBuffer
-        }
-      ] : []
-    };
-    await transporter.sendMail(mailOptionsCustomer);
+    // Send confirmation to Customer if email provided
+    if (customerEmail) {
+      const mailOptionsCustomer = {
+        from: process.env.GMAIL_USER,
+        to: customerEmail,
+        subject: `Confirmação de Pedido - Loja de Peças`,
+        text: `Olá ${customerInfo.name}, recebemos seu pedido! Segue em anexo o resumo em PDF.`,
+        attachments: pdfBuffer ? [
+          {
+            filename: `Pedido_Resumo.pdf`,
+            content: pdfBuffer
+          }
+        ] : []
+      };
+      await transporter.sendMail(mailOptionsCustomer);
+    }
+  } catch (error) {
+    console.error('Failed to send order emails (check GMAIL credentials):', error);
   }
 }

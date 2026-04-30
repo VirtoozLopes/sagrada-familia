@@ -5,7 +5,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const categories = await prisma.$queryRaw`SELECT * FROM "Category" ORDER BY name ASC`;
+    const categories = await prisma.category.findMany({
+      where: { parentId: null },
+      include: { children: true },
+      orderBy: { name: 'asc' }
+    });
     return NextResponse.json(categories);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 });

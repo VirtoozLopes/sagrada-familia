@@ -22,14 +22,12 @@ export async function POST(request: Request) {
           name: product.name,
           description: product.description,
           price: product.price,
-          category: product.category,
         },
         create: {
           code: product.code,
           name: product.name,
           description: product.description,
           price: product.price,
-          category: product.category,
         },
       });
     }

@@ -1,0 +1,8 @@
+tmp
+tmp/
+public/catalog-images/
+public/catalog-thumbnails/
+node_modules/@napi-rs/canvas-linux-x64-gnu/
+node_modules/@napi-rs/canvas-win32-x64-msvc/
+node_modules/@napi-rs/canvas-darwin-x64/
+node_modules/@napi-rs/canvas-darwin-arm64/

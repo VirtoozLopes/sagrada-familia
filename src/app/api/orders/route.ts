@@ -11,22 +11,70 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dados do pedido incompletos' }, { status: 400 });
     }
 
-    // 1. Save order to database
+    // 1. Process items and update stock
+    const processedItems = [];
+    
+    for (const item of items) {
+      if (item.customization) {
+        // Get original product to inherit category if possible
+        const originalProduct = await prisma.product.findUnique({
+          where: { id: item.id }
+        });
+
+        const customCode = `${item.code}-${item.customization.trim()}`.toUpperCase().replace(/\s+/g, '-');
+        const customName = `${item.name} (${item.customization.trim()})`;
+
+        const customProduct = await prisma.product.upsert({
+          where: { code: customCode },
+          update: {
+            stock: { decrement: item.quantity },
+          },
+          create: {
+            code: customCode,
+            name: customName,
+            price: item.price || 0,
+            stock: -item.quantity,
+            categoryId: originalProduct?.categoryId || null,
+          }
+        });
+
+        processedItems.push({
+          productId: customProduct.id,
+          code: customProduct.code,
+          name: customProduct.name,
+          quantity: item.quantity,
+          price: item.price,
+          customization: item.customization,
+        });
+      } else {
+        // Normal item, just decrement stock
+        if (item.id) {
+          await prisma.product.update({
+            where: { id: item.id },
+            data: { stock: { decrement: item.quantity } }
+          });
+        }
+
+        processedItems.push({
+          productId: item.id,
+          code: item.code,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          customization: null,
+        });
+      }
+    }
+
+    // 2. Save order to database
     const order = await prisma.order.create({
       data: {
         customerName: customer.name,
         customerEmail: customer.email,
         customerPhone: customer.phone,
-        totalAmount: items.reduce((sum: number, item: any) => sum + (item.price || 0) * item.quantity, 0),
+        totalAmount: processedItems.reduce((sum: number, item: any) => sum + (item.price || 0) * item.quantity, 0),
         items: {
-          create: items.map((item: any) => ({
-            productId: item.id,
-            code: item.code,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            customization: item.customization || null,
-          })),
+          create: processedItems,
         },
       },
       include: { items: true },

@@ -24,8 +24,12 @@ model Product {
 }
 
 model Category {
-  id       String    @id @default(cuid())
-  name     String    @unique
+  id       String     @id @default(cuid())
+  name     String     @unique
+  slug     String?    @unique
+  parentId String?
+  parent   Category?  @relation("Subcategories", fields: [parentId], references: [id])
+  children Category[] @relation("Subcategories")
   products Product[]
 }
 

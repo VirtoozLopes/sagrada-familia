@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Plus, ImageIcon, Tag, ShoppingCart } from 'lucide-react';
+import { X, Plus, Minus, ImageIcon, Tag, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Product {
@@ -20,14 +20,18 @@ interface ProductModalProps {
   product: Product | null;
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (product: Product) => void;
+  onAdd: (product: Product, quantity: number) => void;
 }
 
 export default function ProductModal({ product, isOpen, onClose, onAdd }: ProductModalProps) {
   const [customizationText, setCustomizationText] = useState('');
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
-    if (isOpen) setCustomizationText('');
+    if (isOpen) {
+      setCustomizationText('');
+      setQuantity(1);
+    }
   }, [isOpen, product]);
 
   if (!product) return null;
@@ -61,12 +65,16 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
             </button>
 
             {/* Left: Image Section */}
-            <div className="md:w-1/2 h-64 md:h-auto bg-white flex items-center justify-center relative border-b md:border-b-0 md:border-r border-stone-100 overflow-hidden">
+            <div 
+              className="md:w-1/2 h-64 md:h-auto bg-white flex items-center justify-center relative border-b md:border-b-0 md:border-r border-stone-100 overflow-hidden select-none"
+              onContextMenu={(e) => e.preventDefault()}
+            >
               {product.imageUrl ? (
                 <img 
                   src={product.imageUrl} 
                   alt={product.name}
-                  className="w-full h-full object-contain p-10 md:p-14 hover:scale-110 transition-transform duration-1000" 
+                  draggable="false"
+                  className="w-full h-full object-contain p-10 md:p-14 hover:scale-110 transition-transform duration-1000 pointer-events-none" 
                 />
               ) : (
                 <div className="flex flex-col items-center gap-4 text-stone-200">
@@ -100,19 +108,40 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
                   </p>
                 </div>
 
-                <div className="flex flex-col md:flex-row md:items-center gap-8 md:gap-16 pt-6 border-t border-stone-100">
+                <div className="flex flex-wrap items-end gap-8 pt-6 border-t border-stone-100">
                   <div>
                     <h4 className="text-stone-400 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Valor Sugerido</h4>
-                    <div className="text-4xl font-black text-stone-900 tracking-tight">
+                    <div className="text-4xl font-black text-stone-900 tracking-tight leading-none">
                       {product.price ? `R$ ${product.price.toFixed(2)}` : '--'}
                     </div>
                   </div>
-                  {product.code && (
-                    <div>
-                      <h4 className="text-stone-400 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Identificação</h4>
-                      <div className="text-xl font-bold text-stone-800 font-mono bg-stone-50 px-3 py-1 rounded-lg border border-stone-100">#{product.code}</div>
+                  <div>
+                    <h4 className="text-stone-400 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Quantidade</h4>
+                    <div className="flex items-center bg-stone-50 rounded-2xl p-1.5 border border-stone-100 w-fit">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="p-2 text-stone-400 hover:text-primary disabled:opacity-30 transition-colors"
+                        disabled={quantity <= 1}
+                      >
+                        <Minus size={20} />
+                      </button>
+                      <input
+                        type="number"
+                        value={quantity || ''}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          setQuantity(isNaN(val) ? 1 : Math.max(1, val));
+                        }}
+                        className="w-16 bg-transparent text-stone-800 font-black text-xl text-center outline-none"
+                      />
+                      <button
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="p-2 text-stone-400 hover:text-primary transition-colors"
+                      >
+                        <Plus size={20} />
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {product.isCustomizable && (
@@ -137,7 +166,7 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
                 <button
                   disabled={!!(product.isCustomizable && !customizationText.trim())}
                   onClick={() => {
-                    onAdd({ ...product, customization: product.isCustomizable ? customizationText.trim() : undefined });
+                    onAdd({ ...product, customization: product.isCustomizable ? customizationText.trim() : undefined }, quantity);
                     onClose();
                   }}
                   className="w-full bg-primary hover:bg-stone-800 disabled:opacity-50 disabled:hover:bg-primary disabled:cursor-not-allowed text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-xl shadow-primary/20 flex items-center justify-center gap-4 group border-b-4 border-black/10"

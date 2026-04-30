@@ -30,12 +30,16 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
         </div>
       )}
       {/* Image Area */}
-      <div className="flex-grow flex items-center justify-center p-4 relative">
+      <div 
+        className="flex-grow flex items-center justify-center p-4 relative select-none"
+        onContextMenu={(e) => e.preventDefault()}
+      >
         {displayImage ? (
           <img
             src={displayImage}
             alt={product.name}
-            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+            draggable="false"
+            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 pointer-events-none"
           />
         ) : (
           <div className="flex flex-col items-center gap-1 opacity-[0.15]">

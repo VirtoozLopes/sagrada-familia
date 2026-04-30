@@ -10,8 +10,8 @@ export async function POST(request: Request) {
 
     // Raw SQL Update since prisma client is out of sync
     await prisma.$executeRaw`
-      UPDATE Product 
-      SET categoryId = ${targetCategoryId} 
+      UPDATE "Product" 
+      SET "categoryId" = ${targetCategoryId} 
       WHERE id = ${productId}
     `;
 

@@ -26,13 +26,17 @@ export async function uploadProductImageAction(formData: FormData) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    const isPng = file.name.toLowerCase().endsWith('.png') || file.type === 'image/png';
+    const ext = isPng ? 'png' : 'jpg';
+    const mimeType = isPng ? 'image/png' : 'image/jpeg';
+    
     const sanitizedCode = code.replace(/\s/g, '_');
-    const fileName = `${sanitizedCode}.jpg`;
+    const fileName = `${sanitizedCode}.${ext}`;
 
     // Upload original to Vercel Blob
     const blob = await put(`catalog-images/${fileName}`, buffer, {
       access: 'public',
-      contentType: 'image/jpeg',
+      contentType: mimeType,
     });
     const imageUrl = blob.url;
 
@@ -41,10 +45,10 @@ export async function uploadProductImageAction(formData: FormData) {
     try {
       const image = await Jimp.read(buffer);
       await image.resize({ w: 300 });
-      const thumbBuffer = await image.getBuffer('image/jpeg');
+      const thumbBuffer = await image.getBuffer(mimeType as any);
       const thumbBlob = await put(`catalog-thumbnails/${fileName}`, thumbBuffer, {
         access: 'public',
-        contentType: 'image/jpeg',
+        contentType: mimeType,
       });
       thumbUrl = thumbBlob.url;
     } catch (jimpError) {
@@ -60,9 +64,9 @@ export async function uploadProductImageAction(formData: FormData) {
     revalidatePath('/admin');
     
     return { success: true, imageUrl, thumbUrl };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading product image:', error);
-    return { success: false, error: 'Falha ao realizar upload da imagem.' };
+    return { success: false, error: error.message || 'Falha ao realizar upload da imagem.' };
   }
 }
 
@@ -89,12 +93,16 @@ export async function createManualProductAction(formData: FormData) {
 
     if (file && file.size > 0) {
       const buffer = Buffer.from(await file.arrayBuffer());
+      const isPng = file.name.toLowerCase().endsWith('.png') || file.type === 'image/png';
+      const ext = isPng ? 'png' : 'jpg';
+      const mimeType = isPng ? 'image/png' : 'image/jpeg';
+
       const sanitizedCode = code.replace(/\s/g, '_');
-      const fileName = `${sanitizedCode}_${Date.now()}.jpg`;
+      const fileName = `${sanitizedCode}_${Date.now()}.${ext}`;
 
       const blob = await put(`catalog-images/${fileName}`, buffer, {
         access: 'public',
-        contentType: 'image/jpeg',
+        contentType: mimeType,
       });
       imageUrl = blob.url;
       thumbUrl = blob.url;
@@ -102,10 +110,10 @@ export async function createManualProductAction(formData: FormData) {
       try {
         const image = await Jimp.read(buffer);
         await image.resize({ w: 300 });
-        const thumbBuffer = await image.getBuffer('image/jpeg');
+        const thumbBuffer = await image.getBuffer(mimeType as any);
         const thumbBlob = await put(`catalog-thumbnails/${fileName}`, thumbBuffer, {
           access: 'public',
-          contentType: 'image/jpeg',
+          contentType: mimeType,
         });
         thumbUrl = thumbBlob.url;
       } catch (jimpError) {
@@ -148,3 +156,35 @@ export async function deleteProductsAction(ids: string[]) {
     return { success: false, error: 'Falha ao excluir os produtos selecionados.' };
   }
 }
+
+export async function updateProductAction(
+  id: string,
+  data: { name: string; code: string; price: string; description: string }
+) {
+  try {
+    if (!id) return { success: false, error: 'ID inválido.' };
+    if (!data.name || !data.code) return { success: false, error: 'Nome e Código são obrigatórios.' };
+
+    const price = data.price ? parseFloat(data.price) : null;
+    const description = data.description || null;
+
+    await prisma.$executeRaw`
+      UPDATE "Product"
+      SET name = ${data.name},
+          code = ${data.code},
+          price = ${price},
+          description = ${description},
+          "updatedAt" = NOW()
+      WHERE id = ${id}
+    `;
+
+    revalidatePath('/');
+    revalidatePath('/admin');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating product:', error);
+    return { success: false, error: error.message || 'Falha ao atualizar produto.' };
+  }
+}
+
