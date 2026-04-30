@@ -75,7 +75,6 @@ export default function Home() {
 
   const handleCategorySelect = (id: string, slug?: string) => {
     setSelectedCategoryId(id);
-    setIsSidebarOpen(false); // Close sidebar on selection
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       if (id === 'all' || !slug) {
