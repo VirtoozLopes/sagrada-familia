@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, AlertCircle, Loader2, Image as ImageIcon, Search, LayoutDashboard, Database, FolderHeart, Sparkles, Trash2, Lock, LogOut, Pencil, X, PackageCheck, TrendingDown, BarChart3, Save, RefreshCw, Printer } from 'lucide-react';
+import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, AlertCircle, Loader2, Image as ImageIcon, Search, LayoutDashboard, Database, FolderHeart, Sparkles, Trash2, Lock, LogOut, Pencil, X, PackageCheck, TrendingDown, BarChart3, Save, RefreshCw, Printer, PieChart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { processPdfAction, scanLocalCatalogAction } from '@/app/actions/pdf';
 import { getAllProductsAction, uploadProductImageAction, createManualProductAction, deleteProductsAction, updateProductAction } from '@/app/actions/product';
@@ -28,7 +28,7 @@ export default function AdminPage() {
   const [pdfStatus, setPdfStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'import' | 'catalog' | 'categories' | 'estoque'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'import' | 'catalog' | 'categories' | 'estoque' | 'relatorio'>('dashboard');
 
   // Categories State
   const [categories, setCategories] = useState<Category[]>([]);
@@ -96,6 +96,21 @@ export default function AdminPage() {
   const [reportData, setReportData] = useState<any>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isDeletingItem, setIsDeletingItem] = useState<string | null>(null);
+
+  // Top Categories Dashboard State
+  const [topCategories, setTopCategories] = useState<any[]>([]);
+  const [topCatPeriod, setTopCatPeriod] = useState<'alltime' | 'monthly' | 'weekly'>('alltime');
+  const [isLoadingTopCat, setIsLoadingTopCat] = useState(false);
+
+  const fetchTopCategories = async (period = topCatPeriod) => {
+    setIsLoadingTopCat(true);
+    try {
+      const res = await fetch(`/api/reports/top-categories?period=${period}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setTopCategories(data);
+    } catch (e) { /* silent */ }
+    setIsLoadingTopCat(false);
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -663,11 +678,18 @@ export default function AdminPage() {
               Grupos
             </button>
             <button 
-              onClick={() => { setActiveTab('estoque'); fetchStock(); fetchDailyReport(reportDate); }}
+              onClick={() => { setActiveTab('estoque'); fetchStock(); }}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'estoque' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
             >
               <PackageCheck size={16} />
               Estoque
+            </button>
+            <button 
+              onClick={() => { setActiveTab('relatorio'); fetchDailyReport(reportDate); fetchTopCategories('alltime'); }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'relatorio' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
+            >
+              <PieChart size={16} />
+              Relatório
             </button>
             </nav>
             <button 
@@ -1564,157 +1586,121 @@ export default function AdminPage() {
                 )}
               </div>
 
-              {/* ── Daily Report Panel ── */}
+            </motion.div>
+          )}
+
+          {/* RELATÓRIO TAB */}
+          {activeTab === 'relatorio' && (
+            <motion.div key="relatorio" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-10">
               <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
-                {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-8 py-6 border-b border-stone-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-500/10 rounded-2xl flex items-center justify-center">
-                      <BarChart3 size={20} className="text-green-600" />
+                    <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center"><PieChart size={20} className="text-primary" /></div>
+                    <div>
+                      <h2 className="text-lg font-black text-stone-800 uppercase tracking-tight">Top 5 Categorias</h2>
+                      <p className="text-xs text-stone-400 font-medium">Categorias mais vendidas por volume de peças</p>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-1 bg-stone-100 border border-stone-200 rounded-xl p-1">
+                    {(['alltime', 'monthly', 'weekly'] as const).map(p => (
+                      <button key={p} onClick={() => { setTopCatPeriod(p); fetchTopCategories(p); }}
+                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${topCatPeriod === p ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}>
+                        {p === 'alltime' ? 'Sempre' : p === 'monthly' ? 'Este Mês' : 'Esta Semana'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-8">
+                  {isLoadingTopCat ? (
+                    <div className="flex items-center justify-center py-12 gap-3 text-stone-400"><Loader2 size={24} className="animate-spin" /><span className="text-sm font-bold">Calculando...</span></div>
+                  ) : topCategories.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-stone-400 gap-3"><PieChart size={48} strokeWidth={1} className="opacity-30" /><p className="text-sm font-bold">Nenhum dado de vendas disponível.</p></div>
+                  ) : (() => {
+                    const maxQty = Math.max(...topCategories.map((c: any) => Number(c.totalQuantity)));
+                    const colors = ['bg-primary','bg-amber-500','bg-green-500','bg-blue-500','bg-purple-500'];
+                    const textColors = ['text-primary','text-amber-500','text-green-500','text-blue-500','text-purple-500'];
+                    return (
+                      <div className="space-y-6">
+                        {topCategories.map((cat: any, idx: number) => {
+                          const pct = maxQty > 0 ? (Number(cat.totalQuantity) / maxQty) * 100 : 0;
+                          return (
+                            <div key={cat.categoryId} className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black text-white ${colors[idx]}`}>{idx + 1}</span>
+                                  <span className="font-black text-stone-800 uppercase tracking-tight text-sm">{cat.categoryName}</span>
+                                </div>
+                                <div className="flex items-center gap-6 text-right">
+                                  <div><div className={`text-xl font-black ${textColors[idx]}`}>{Number(cat.totalQuantity)}</div><div className="text-[10px] text-stone-400 font-black uppercase tracking-widest">peças</div></div>
+                                  <div><div className="text-xl font-black text-stone-700">{Number(cat.totalRevenue) > 0 ? `R$ ${Number(cat.totalRevenue).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : '—'}</div><div className="text-[10px] text-stone-400 font-black uppercase tracking-widest">receita</div></div>
+                                </div>
+                              </div>
+                              <div className="w-full bg-stone-100 rounded-full h-2.5 overflow-hidden">
+                                <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, ease: 'easeOut', delay: idx * 0.1 }} className={`h-full rounded-full ${colors[idx]}`} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-8 py-6 border-b border-stone-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-500/10 rounded-2xl flex items-center justify-center"><BarChart3 size={20} className="text-green-600" /></div>
                     <div>
                       <h2 className="text-lg font-black text-stone-800 uppercase tracking-tight">Relatório de Vendas</h2>
-                      <p className="text-xs text-stone-400 font-medium">
-                        {reportData?.period === 'weekly' && reportData?.startDate 
-                          ? `Semana de ${reportData.startDate.split('-').reverse().join('/')} a ${reportData.endDate.split('-').reverse().join('/')}`
-                          : 'Pedidos recebidos no dia selecionado'}
-                      </p>
+                      <p className="text-xs text-stone-400 font-medium">{reportData?.period === 'weekly' && reportData?.startDate ? `Semana de ${reportData.startDate.split('-').reverse().join('/')} a ${reportData.endDate.split('-').reverse().join('/')}` : 'Pedidos recebidos no dia selecionado'}</p>
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-center gap-3">
                     <div className="flex items-center gap-1 bg-stone-100 border border-stone-200 rounded-xl p-1">
-                      <button
-                        onClick={() => { setReportPeriod('daily'); fetchDailyReport(reportDate, 'daily'); }}
-                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${reportPeriod === 'daily' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
-                      >
-                        Diário
-                      </button>
-                      <button
-                        onClick={() => { setReportPeriod('weekly'); fetchDailyReport(reportDate, 'weekly'); }}
-                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${reportPeriod === 'weekly' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
-                      >
-                        Semanal
-                      </button>
+                      <button onClick={() => { setReportPeriod('daily'); fetchDailyReport(reportDate, 'daily'); }} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${reportPeriod === 'daily' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}>Diário</button>
+                      <button onClick={() => { setReportPeriod('weekly'); fetchDailyReport(reportDate, 'weekly'); }} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${reportPeriod === 'weekly' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}>Semanal</button>
                     </div>
-                    <input
-                      type="date"
-                      value={reportDate}
-                      max={todayStr()}
-                      onChange={e => { setReportDate(e.target.value); fetchDailyReport(e.target.value, reportPeriod); }}
-                      className="bg-stone-50 border border-stone-200 rounded-xl py-2.5 px-4 text-sm font-bold text-stone-700 outline-none focus:border-primary transition-all cursor-pointer"
-                    />
-                    <button
-                      onClick={() => fetchDailyReport(reportDate)}
-                      className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 text-stone-500 hover:text-green-600 hover:border-green-300 transition-all"
-                      title="Atualizar"
-                    >
-                      <RefreshCw size={16} />
-                    </button>
-                    <button
-                      onClick={handlePrintReport}
-                      disabled={!reportData || reportData.items?.length === 0}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-green-600/20"
-                      title="Exportar PDF / Imprimir"
-                    >
-                      <Printer size={15} />
-                      <span className="hidden sm:inline">Exportar PDF</span>
-                    </button>
+                    <input type="date" value={reportDate} max={todayStr()} onChange={e => { setReportDate(e.target.value); fetchDailyReport(e.target.value, reportPeriod); }} className="bg-stone-50 border border-stone-200 rounded-xl py-2.5 px-4 text-sm font-bold text-stone-700 outline-none focus:border-primary transition-all cursor-pointer" />
+                    <button onClick={() => fetchDailyReport(reportDate)} className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 text-stone-500 hover:text-green-600 hover:border-green-300 transition-all"><RefreshCw size={16} /></button>
+                    <button onClick={handlePrintReport} disabled={!reportData || reportData.items?.length === 0} className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-green-600/20"><Printer size={15} /><span className="hidden sm:inline">Exportar PDF</span></button>
                   </div>
                 </div>
-
-                {/* Summary cards */}
                 {reportData && (
                   <div className="grid grid-cols-3 gap-4 px-8 py-5 border-b border-stone-100 bg-stone-50/40">
-                    <div className="text-center">
-                      <div className="text-2xl font-black text-stone-800">{Number(reportData.summary?.totalOrders ?? 0)}</div>
-                      <div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Pedidos</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-black text-primary">{Number(reportData.summary?.totalItems ?? 0)}</div>
-                      <div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Peças Vendidas</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-black text-green-600">
-                        {Number(reportData.summary?.totalRevenue ?? 0) > 0
-                          ? `R$ ${Number(reportData.summary.totalRevenue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                          : '—'}
-                      </div>
-                      <div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Receita Total</div>
-                    </div>
+                    <div className="text-center"><div className="text-2xl font-black text-stone-800">{Number(reportData.summary?.totalOrders ?? 0)}</div><div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Pedidos</div></div>
+                    <div className="text-center"><div className="text-2xl font-black text-primary">{Number(reportData.summary?.totalItems ?? 0)}</div><div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Peças Vendidas</div></div>
+                    <div className="text-center"><div className="text-2xl font-black text-green-600">{Number(reportData.summary?.totalRevenue ?? 0) > 0 ? `R$ ${Number(reportData.summary.totalRevenue).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : '—'}</div><div className="text-[10px] text-stone-400 font-black uppercase tracking-widest mt-0.5">Receita Total</div></div>
                   </div>
                 )}
-
-                {/* Report table */}
                 {isLoadingReport ? (
-                  <div className="flex items-center justify-center py-16 gap-3 text-stone-400">
-                    <Loader2 size={24} className="animate-spin" />
-                    <span className="text-sm font-bold">Carregando relatório...</span>
-                  </div>
+                  <div className="flex items-center justify-center py-16 gap-3 text-stone-400"><Loader2 size={24} className="animate-spin" /><span className="text-sm font-bold">Carregando relatório...</span></div>
                 ) : !reportData || reportData.items?.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-stone-400 gap-3">
-                    <BarChart3 size={48} strokeWidth={1} className="opacity-30" />
-                    <p className="text-sm font-bold">Nenhum pedido registrado nesta data.</p>
-                  </div>
+                  <div className="flex flex-col items-center justify-center py-16 text-stone-400 gap-3"><BarChart3 size={48} strokeWidth={1} className="opacity-30" /><p className="text-sm font-bold">Nenhum pedido registrado nesta data.</p></div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-stone-100 bg-stone-50/60">
-                          <th className="text-left py-3 px-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Código</th>
-                          <th className="text-left py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Nome</th>
-                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Qtd Vendida</th>
-                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Preço Unit.</th>
-                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Subtotal</th>
-                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Estoque Atual</th>
-                          <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Ações</th>
-                        </tr>
-                      </thead>
+                      <thead><tr className="border-b border-stone-100 bg-stone-50/60">
+                        <th className="text-left py-3 px-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Código</th>
+                        <th className="text-left py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Nome</th>
+                        <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Qtd Vendida</th>
+                        <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Preço Unit.</th>
+                        <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Subtotal</th>
+                        <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Estoque Atual</th>
+                        <th className="text-center py-3 px-4 text-[10px] font-black text-stone-400 uppercase tracking-widest">Ações</th>
+                      </tr></thead>
                       <tbody className="divide-y divide-stone-50">
                         {(reportData.items as any[]).map((item: any, idx: number) => {
                           const outOfStock = item.currentStock !== null && Number(item.currentStock) < 0;
                           return (
                             <tr key={idx} className={`transition-colors hover:bg-stone-50/60 ${outOfStock ? 'bg-red-50/30' : ''}`}>
-                              <td className="py-3 px-6">
-                                <span className="font-black text-primary text-[11px] uppercase tracking-wider">{item.code}</span>
-                              </td>
-                              <td className="py-3 px-4 font-medium text-stone-700 max-w-xs">
-                                <div className="flex items-center gap-2">
-                                  {item.name}
-                                  {outOfStock && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap">
-                                      <TrendingDown size={9} /> Sem estoque
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                <span className="inline-block px-3 py-1 bg-primary/10 text-primary font-black rounded-full text-xs">
-                                  {Number(item.totalQuantity)}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-center text-stone-500 font-medium">
-                                {item.avgPrice ? `R$ ${Number(item.avgPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
-                              </td>
-                              <td className="py-3 px-4 text-center font-bold text-stone-800">
-                                {Number(item.totalValue) > 0 ? `R$ ${Number(item.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {item.currentStock !== null ? (
-                                  <span className={`font-black text-sm ${Number(item.currentStock) < 0 ? 'text-red-500' : Number(item.currentStock) === 0 ? 'text-amber-500' : 'text-green-600'}`}>
-                                    {Number(item.currentStock)}
-                                  </span>
-                                ) : <span className="text-stone-300">—</span>}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                <button
-                                  onClick={() => handleDeleteReportItem(item.code)}
-                                  disabled={isDeletingItem === item.code}
-                                  className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                                  title="Apagar vendas deste item"
-                                >
-                                  {isDeletingItem === item.code ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                                </button>
-                              </td>
+                              <td className="py-3 px-6"><span className="font-black text-primary text-[11px] uppercase tracking-wider">{item.code}</span></td>
+                              <td className="py-3 px-4 font-medium text-stone-700 max-w-xs"><div className="flex items-center gap-2">{item.name}{outOfStock && (<span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap"><TrendingDown size={9} /> Sem estoque</span>)}</div></td>
+                              <td className="py-3 px-4 text-center"><span className="inline-block px-3 py-1 bg-primary/10 text-primary font-black rounded-full text-xs">{Number(item.totalQuantity)}</span></td>
+                              <td className="py-3 px-4 text-center text-stone-500 font-medium">{item.avgPrice ? `R$ ${Number(item.avgPrice).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : '—'}</td>
+                              <td className="py-3 px-4 text-center font-bold text-stone-800">{Number(item.totalValue) > 0 ? `R$ ${Number(item.totalValue).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : '—'}</td>
+                              <td className="py-3 px-4 text-center">{item.currentStock !== null ? (<span className={`font-black text-sm ${Number(item.currentStock) < 0 ? 'text-red-500' : Number(item.currentStock) === 0 ? 'text-amber-500' : 'text-green-600'}`}>{Number(item.currentStock)}</span>) : <span className="text-stone-300">—</span>}</td>
+                              <td className="py-3 px-4 text-center"><button onClick={() => handleDeleteReportItem(item.code)} disabled={isDeletingItem === item.code} className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50">{isDeletingItem === item.code ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}</button></td>
                             </tr>
                           );
                         })}
@@ -1725,6 +1711,7 @@ export default function AdminPage() {
               </div>
             </motion.div>
           )}
+
 
           {activeTab === 'categories' && (
             <motion.div
