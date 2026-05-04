@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, AlertCircle, Loader2, Image as ImageIcon, Search, LayoutDashboard, Database, FolderHeart, Sparkles, Trash2, Lock, LogOut, Pencil, X, PackageCheck, TrendingDown, BarChart3, Save, RefreshCw, Printer, PieChart } from 'lucide-react';
+import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, AlertCircle, Loader2, Image as ImageIcon, Search, LayoutDashboard, Database, FolderHeart, Sparkles, Trash2, Lock, LogOut, Pencil, X, PackageCheck, TrendingDown, BarChart3, Save, RefreshCw, Printer, PieChart, Menu, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { processPdfAction, scanLocalCatalogAction } from '@/app/actions/pdf';
 import { getAllProductsAction, uploadProductImageAction, createManualProductAction, deleteProductsAction, updateProductAction } from '@/app/actions/product';
@@ -29,6 +29,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState('');
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'import' | 'catalog' | 'categories' | 'estoque' | 'relatorio'>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Categories State
   const [categories, setCategories] = useState<Category[]>([]);
@@ -638,70 +639,160 @@ export default function AdminPage() {
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Tab labels map
+  const TABS = [
+    { id: 'dashboard',  label: 'Geral',      icon: LayoutDashboard, action: () => setActiveTab('dashboard') },
+    { id: 'import',     label: 'Entrada',    icon: Database,        action: () => setActiveTab('import') },
+    { id: 'catalog',    label: 'Vitrine',    icon: FolderHeart,     action: () => setActiveTab('catalog') },
+    { id: 'categories', label: 'Grupos',     icon: Settings,        action: () => setActiveTab('categories') },
+    { id: 'estoque',    label: 'Estoque',    icon: PackageCheck,    action: () => { setActiveTab('estoque'); fetchStock(); } },
+    { id: 'relatorio',  label: 'Relatório',  icon: PieChart,        action: () => { setActiveTab('relatorio'); fetchDailyReport(reportDate); fetchTopCategories('alltime'); } },
+  ] as const;
+
+  const activeTabLabel = TABS.find(t => t.id === activeTab)?.label ?? '';
+
   return (
-    <main className="min-h-screen bg-transparent p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-          <div>
-            <h1 className="text-4xl font-black text-gradient tracking-tight">GESTÃO SAGRADA FAMÍLIA</h1>
-            <p className="text-stone-500 mt-1">Gerencie seu inventário de artigos religiosos com facilidade.</p>
+    <main className="min-h-screen bg-transparent">
+
+      {/* ── Mobile Menu Drawer overlay ── */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div
+              key="overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[200] md:hidden"
+            />
+            <motion.div
+              key="drawer"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-[201] bg-white rounded-t-3xl shadow-2xl pb-safe md:hidden"
+            >
+              {/* Handle bar */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 bg-stone-200 rounded-full" />
+              </div>
+              <div className="px-4 pt-2 pb-6">
+                <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-4 px-2">Navegar para</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {TABS.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => { tab.action(); setIsMobileMenuOpen(false); }}
+                        className={`flex flex-col items-center gap-2 py-4 px-2 rounded-2xl transition-all ${
+                          isActive
+                            ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                            : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
+                        }`}
+                      >
+                        <Icon size={22} />
+                        <span className="text-[10px] font-black uppercase tracking-wider">{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={async () => { await logoutAction(); window.location.href = '/admin/login'; }}
+                  className="mt-4 w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-red-50 text-red-500 border border-red-100 text-xs font-black uppercase tracking-widest"
+                >
+                  <LogOut size={18} />
+                  Sair do Painel
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Mobile sticky bottom bar ── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-[150] md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-100 shadow-2xl flex items-center px-2 pb-safe h-16">
+        {TABS.slice(0, 5).map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => tab.action()}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-all ${
+                isActive ? 'text-primary' : 'text-stone-400'
+              }`}
+            >
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+              <span className="text-[9px] font-black uppercase tracking-wide">{tab.label}</span>
+            </button>
+          );
+        })}
+        {/* More button — opens drawer */}
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-all ${
+            activeTab === 'relatorio' ? 'text-primary' : 'text-stone-400'
+          }`}
+        >
+          <PieChart size={20} strokeWidth={activeTab === 'relatorio' ? 2.5 : 1.8} />
+          <span className="text-[9px] font-black uppercase tracking-wide">Relatório</span>
+        </button>
+      </nav>
+
+      <div className="max-w-6xl mx-auto px-4 md:px-8 pt-4 md:pt-8 pb-24 md:pb-8">
+        {/* ── HEADER ── */}
+        <header className="mb-8">
+          {/* Mobile header */}
+          <div className="flex items-center justify-between md:hidden">
+            <div>
+              <h1 className="text-xl font-black text-gradient tracking-tight leading-tight">GESTÃO SAGRADA FAMÍLIA</h1>
+              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">{activeTabLabel}</p>
+            </div>
+            <button
+              onClick={async () => { await logoutAction(); window.location.href = '/admin/login'; }}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-red-50 text-red-500 border border-red-100"
+            >
+              <LogOut size={15} />
+            </button>
           </div>
-          
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <nav className="flex p-1.5 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-2xl shadow-sm">
-            <button 
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
-            >
-              <LayoutDashboard size={16} />
-              Geral
-            </button>
-            <button 
-              onClick={() => setActiveTab('import')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'import' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
-            >
-              <Database size={16} />
-              Entrada
-            </button>
-            <button 
-              onClick={() => setActiveTab('catalog')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'catalog' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
-            >
-              <FolderHeart size={16} />
-              Vitrine
-            </button>
-            <button 
-              onClick={() => setActiveTab('categories')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
-            >
-              <Settings size={16} />
-              Grupos
-            </button>
-            <button 
-              onClick={() => { setActiveTab('estoque'); fetchStock(); }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'estoque' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
-            >
-              <PackageCheck size={16} />
-              Estoque
-            </button>
-            <button 
-              onClick={() => { setActiveTab('relatorio'); fetchDailyReport(reportDate); fetchTopCategories('alltime'); }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'relatorio' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'}`}
-            >
-              <PieChart size={16} />
-              Relatório
-            </button>
-            </nav>
-            <button 
-              onClick={async () => {
-                await logoutAction();
-                window.location.href = '/admin/login';
-              }}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all bg-red-50 text-red-500 hover:bg-red-100 border border-red-100 shrink-0"
-            >
-              <LogOut size={16} />
-              <span className="hidden sm:inline">Sair</span>
-            </button>
+
+          {/* Desktop header */}
+          <div className="hidden md:flex md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h1 className="text-4xl font-black text-gradient tracking-tight">GESTÃO SAGRADA FAMÍLIA</h1>
+              <p className="text-stone-500 mt-1">Gerencie seu inventário de artigos religiosos com facilidade.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <nav className="flex p-1.5 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-2xl shadow-sm">
+                {TABS.map(tab => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => tab.action()}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        isActive ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-stone-400 hover:text-primary'
+                      }`}
+                    >
+                      <Icon size={16} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </nav>
+              <button
+                onClick={async () => { await logoutAction(); window.location.href = '/admin/login'; }}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all bg-red-50 text-red-500 hover:bg-red-100 border border-red-100 shrink-0"
+              >
+                <LogOut size={16} />
+                Sair
+              </button>
+            </div>
           </div>
         </header>
 
