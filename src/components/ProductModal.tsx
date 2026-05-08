@@ -79,7 +79,7 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
               ) : (
                 <div className="flex flex-col items-center gap-4 text-stone-200">
                   <ImageIcon size={100} strokeWidth={1} />
-                  <span className="text-[10px] uppercase font-black tracking-[0.3em]">Ilustração Indisponível</span>
+                  <span className="text-[10px] uppercase font-black tracking-[0.3em]">IlustraÃ§Ã£o IndisponÃ­vel</span>
                 </div>
               )}
               
@@ -93,7 +93,7 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
             {/* Right: Info Section */}
             <div className="md:w-1/2 p-10 md:p-16 flex flex-col overflow-y-auto bg-white">
               <div className="mb-10">
-                <div className="text-primary font-black text-[10px] uppercase tracking-[0.4em] mb-4">Arte & Devoção</div>
+                <div className="text-primary font-black text-[10px] uppercase tracking-[0.4em] mb-4">Arte & DevoÃ§Ã£o</div>
                 <h2 className="text-3xl md:text-4xl font-black text-stone-800 leading-tight mb-6 tracking-tight uppercase">
                   {product.name}
                 </h2>
@@ -102,9 +102,9 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
 
               <div className="space-y-8 flex-grow">
                 <div className="space-y-3">
-                  <h4 className="text-stone-400 text-[10px] font-black uppercase tracking-[0.2em]">Sobre esta peça</h4>
+                  <h4 className="text-stone-400 text-[10px] font-black uppercase tracking-[0.2em]">Sobre esta peÃ§a</h4>
                   <p className="text-stone-700 leading-relaxed font-medium text-sm md:text-base">
-                    {product.description || 'Uma peça selecionada com cuidado e devoção para momentos especiais.'}
+                    {product.description || 'Uma peÃ§a selecionada com cuidado e devoÃ§Ã£o para momentos especiais.'}
                   </p>
                 </div>
 
@@ -128,9 +128,17 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
                       <input
                         type="number"
                         value={quantity || ''}
+                        onFocus={(e) => e.target.select()}
+                        onBlur={() => {
+                          if (!quantity || quantity < 1) setQuantity(1);
+                        }}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value);
-                          setQuantity(isNaN(val) ? 1 : Math.max(1, val));
+                          if (e.target.value === '') {
+                            setQuantity(0);
+                          } else {
+                            const val = parseInt(e.target.value);
+                            setQuantity(isNaN(val) ? 0 : val);
+                          }
                         }}
                         className="w-16 bg-transparent text-stone-800 font-black text-xl text-center outline-none"
                       />
@@ -147,7 +155,7 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
                 {product.isCustomizable && (
                   <div className="pt-6 border-t border-stone-100">
                     <label className="block text-primary text-[10px] font-black uppercase tracking-[0.2em] mb-3">
-                      Personalização Obrigatória
+                      PersonalizaÃ§Ã£o ObrigatÃ³ria
                     </label>
                     <input 
                       required
@@ -166,7 +174,7 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
                 <button
                   disabled={!!(product.isCustomizable && !customizationText.trim())}
                   onClick={() => {
-                    onAdd({ ...product, customization: product.isCustomizable ? customizationText.trim() : undefined }, quantity);
+                    onAdd({ ...product, customization: product.isCustomizable ? customizationText.trim() : undefined }, Math.max(1, quantity));
                     onClose();
                   }}
                   className="w-full bg-primary hover:bg-stone-800 disabled:opacity-50 disabled:hover:bg-primary disabled:cursor-not-allowed text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-xl shadow-primary/20 flex items-center justify-center gap-4 group border-b-4 border-black/10"
@@ -175,7 +183,7 @@ export default function ProductModal({ product, isOpen, onClose, onAdd }: Produc
                   Levar para o Carrinho
                 </button>
                 <p className="text-center text-stone-400 text-[9px] uppercase font-black tracking-[0.3em] mt-6">
-                  Artigos Religiosos • Sagrada Família
+                  Artigos Religiosos â€¢ Sagrada FamÃ­lia
                 </p>
               </div>
             </div>
