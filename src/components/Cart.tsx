@@ -97,7 +97,7 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onClear, onSub
                     <div className="w-24 h-24 bg-stone-100 rounded-full flex items-center justify-center">
                       <ShoppingCart size={40} strokeWidth={1} />
                     </div>
-                    <p className="font-medium text-stone-500">Seu carrinho está vazio.<br />Adicione itens para começar.</p>
+                    <p className="font-medium text-stone-500">Seu carrinho estÃ¡ vazio.<br />Adicione itens para comeÃ§ar.</p>
                   </div>
                 ) : step === 'review' ? (
                   <div className="space-y-4">
@@ -109,7 +109,7 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onClear, onSub
                             <div className="text-stone-800 font-bold uppercase text-sm leading-tight">{item.name}</div>
                             {item.customization && (
                               <div className="text-xs text-stone-500 font-medium mt-1">
-                                📌 Personalização: <span className="font-bold text-stone-700">{item.customization}</span>
+                                ðŸ“Œ PersonalizaÃ§Ã£o: <span className="font-bold text-stone-700">{item.customization}</span>
                               </div>
                             )}
                           </div>
@@ -158,9 +158,8 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onClear, onSub
                       />
                     </div>
                     <div className="space-y-3">
-                      <label className="text-[11px] font-black text-stone-900 uppercase tracking-widest ml-1">WhatsApp (Celular)</label>
+                      <label className="text-[11px] font-black text-stone-900 uppercase tracking-widest ml-1">WhatsApp (Opcional)</label>
                       <input
-                        required
                         type="tel"
                         className="w-full bg-white border border-stone-200 rounded-2xl py-4 px-5 text-stone-800 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-stone-400"
                         value={customer.phone}
@@ -203,7 +202,7 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onClear, onSub
                         className="w-full bg-primary hover:bg-stone-800 text-white font-black uppercase text-xs tracking-[0.2em] py-5 rounded-[2rem] shadow-xl shadow-primary/20 flex items-center justify-center gap-3 transition-all active:scale-95 border-b-4 border-black/10"
                       >
                         <FileText size={18} />
-                        Próximo Passo
+                        PrÃ³ximo Passo
                       </button>
                       <button
                         onClick={() => {
@@ -240,7 +239,7 @@ export default function Cart({ items, onUpdateQuantity, onRemove, onClear, onSub
                         onClick={() => setStep('review')}
                         className="w-full text-stone-400 hover:text-stone-600 font-bold mt-2 transition-all py-2 text-xs uppercase tracking-widest"
                       >
-                        Voltar para revisão
+                        Voltar para revisÃ£o
                       </button>
                     </div>
                   )}
