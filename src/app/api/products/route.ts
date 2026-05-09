@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';av
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
@@ -7,7 +7,9 @@ export async function GET(request: Request) {
   const categoryId = searchParams.get('categoryId');
 
   try {
-    let whereClause: any = {};
+    let whereClause: any = {
+      code: { not: { contains: '-' } }
+    };
 
     if (query) {
       whereClause.OR = [
