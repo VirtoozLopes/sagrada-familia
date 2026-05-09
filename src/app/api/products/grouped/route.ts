@@ -24,7 +24,7 @@ export async function GET(request: Request) {
             ORDER BY p.code ASC
           ) AS rn
         FROM "Product" p
-        WHERE p.code != 'Código' AND p.name != 'Produto'
+        WHERE p.code != 'Código' AND p.name != 'Produto' AND p.code NOT LIKE '%-%'
       ) ranked
       WHERE rn <= ${limitSql}
       ORDER BY "categoryId", code ASC
