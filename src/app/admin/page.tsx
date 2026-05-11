@@ -200,6 +200,21 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
     setIsDeletingOrder(null);
   };
 
+  const handleQuickStatus = async (orderId: string, newStatus: string) => {
+    // Optimistic update
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    try {
+      await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (e) {
+      // Revert on error
+      fetchOrders();
+    }
+  };
+
   useEffect(() => {
     setIsMounted(true);
     fetchProducts();
@@ -2021,6 +2036,12 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
                                 <span className="hidden sm:inline">Excluir</span>
                               </button>
                             </div>
+                          </div>
+                          {/* Quick status pills */}
+                          <div className="flex gap-1.5 mt-3">
+                            <button onClick={() => handleQuickStatus(order.id, 'PENDING')} className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wide transition-all border ${order.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-amber-200 hover:text-amber-600'}`}>Pendente</button>
+                            <button onClick={() => handleQuickStatus(order.id, 'CONFIRMED')} className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wide transition-all border ${order.status === 'CONFIRMED' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-green-200 hover:text-green-600'}`}>Confirmado</button>
+                            <button onClick={() => handleQuickStatus(order.id, 'CANCELLED')} className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wide transition-all border ${order.status === 'CANCELLED' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-red-200 hover:text-red-500'}`}>Cancelado</button>
                           </div>
                           {/* Items preview */}
                           <div className="mt-2 flex flex-wrap gap-1">
