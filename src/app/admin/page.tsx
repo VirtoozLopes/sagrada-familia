@@ -109,6 +109,7 @@ export default function AdminPage() {
   const [editNotes, setEditNotes] = useState('');
   const [editOrderStatus, setEditOrderStatus] = useState('PENDING');
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [isDeletingOrder, setIsDeletingOrder] = useState<string | null>(null);
 
   // Top Categories Dashboard State
   const [topCategories, setTopCategories] = useState<any[]>([]);
@@ -187,6 +188,16 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
       }
     } catch (e) {}
     setIsSavingOrder(false);
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.')) return;
+    setIsDeletingOrder(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      if (res.ok) setOrders(prev => prev.filter(o => o.id !== orderId));
+    } catch (e) {}
+    setIsDeletingOrder(null);
   };
 
   useEffect(() => {
@@ -1895,9 +1906,27 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
                         <div>
                           <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2">Status</label>
                           <div className="flex gap-2">
-                            {[['PENDING','Pendente','bg-amber-100 text-amber-700 border-amber-200'],['CONFIRMED','Confirmado','bg-green-100 text-green-700 border-green-200'],['CANCELLED','Cancelado','bg-red-100 text-red-700 border-red-200']].map(([val, label, cls]) => (
-                              <button key={val} onClick={() => setEditOrderStatus(val)} className={`flex-1 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider transition-all ${editOrderStatus === val ? cls + ' shadow-sm scale-105' : 'bg-stone-50 border-stone-200 text-stone-400'}`}>{label}</button>
-                            ))}
+                            <button
+                              onClick={() => setEditOrderStatus('PENDING')}
+                              className={`flex-1 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider transition-all ${
+                                editOrderStatus === 'PENDING'
+                                  ? 'bg-amber-100 text-amber-700 border-amber-200 shadow-sm'
+                                  : 'bg-stone-50 border-stone-200 text-stone-400 hover:border-amber-200 hover:text-amber-600'
+                              }`}>Pendente</button>
+                            <button
+                              onClick={() => setEditOrderStatus('CONFIRMED')}
+                              className={`flex-1 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider transition-all ${
+                                editOrderStatus === 'CONFIRMED'
+                                  ? 'bg-green-100 text-green-700 border-green-200 shadow-sm'
+                                  : 'bg-stone-50 border-stone-200 text-stone-400 hover:border-green-200 hover:text-green-600'
+                              }`}>Confirmado</button>
+                            <button
+                              onClick={() => setEditOrderStatus('CANCELLED')}
+                              className={`flex-1 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider transition-all ${
+                                editOrderStatus === 'CANCELLED'
+                                  ? 'bg-red-100 text-red-700 border-red-200 shadow-sm'
+                                  : 'bg-stone-50 border-stone-200 text-stone-400 hover:border-red-200 hover:text-red-500'
+                              }`}>Cancelado</button>
                           </div>
                         </div>
                         <div>
@@ -1974,11 +2003,22 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <button onClick={() => { setEditOrder(order); setEditCustomerName(order.customerName || ''); setEditCustomerPhone(order.customerPhone || ''); setEditNotes(order.notes || ''); setEditOrderStatus(order.status || 'PENDING'); }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 text-stone-600 hover:bg-primary/10 hover:text-primary transition-all text-xs font-black uppercase tracking-wide">
+                              <button
+                                onClick={() => { setEditOrder(order); setEditCustomerName(order.customerName || ''); setEditCustomerPhone(order.customerPhone || ''); setEditNotes(order.notes || ''); setEditOrderStatus(order.status || 'PENDING'); }}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 text-stone-600 hover:bg-primary/10 hover:text-primary transition-all text-xs font-black uppercase tracking-wide">
                                 <Pencil size={13} /> <span className="hidden sm:inline">Editar</span>
                               </button>
-                              <button onClick={() => handlePrintOrder(order)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-xs font-black uppercase tracking-wide">
+                              <button
+                                onClick={() => handlePrintOrder(order)}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-xs font-black uppercase tracking-wide">
                                 <Printer size={13} /> <span className="hidden sm:inline">Imprimir</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteOrder(order.id)}
+                                disabled={isDeletingOrder === order.id}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all text-xs font-black uppercase tracking-wide disabled:opacity-50">
+                                {isDeletingOrder === order.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                                <span className="hidden sm:inline">Excluir</span>
                               </button>
                             </div>
                           </div>
