@@ -40,6 +40,8 @@ model Order {
   customerPhone String?
   totalAmount  Float?
   status       String      @default("PENDING")
+  notes        String?
+  sellerPhone  String?
   items        OrderItem[]
   createdAt    DateTime    @default(now())
 }

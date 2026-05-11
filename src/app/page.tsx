@@ -170,7 +170,7 @@ export default function Home() {
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer, items: cartItems }),
+        body: JSON.stringify({ customer, items: cartItems, sellerPhone: targetWhatsappNumber || null }),
       });
       
       if (res.ok) {

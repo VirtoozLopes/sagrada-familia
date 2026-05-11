@@ -72,6 +72,7 @@ export async function POST(request: Request) {
         customerName: customer.name,
         customerEmail: customer.email,
         customerPhone: customer.phone,
+        sellerPhone: body.sellerPhone || null,
         totalAmount: processedItems.reduce((sum: number, item: any) => sum + (item.price || 0) * item.quantity, 0),
         items: {
           create: processedItems,

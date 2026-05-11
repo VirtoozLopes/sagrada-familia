@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, AlertCircle, Loader2, Image as ImageIcon, Search, LayoutDashboard, Database, FolderHeart, Sparkles, Trash2, Lock, LogOut, Pencil, X, PackageCheck, TrendingDown, BarChart3, Save, RefreshCw, Printer, PieChart, Menu, ChevronDown } from 'lucide-react';
+import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, AlertCircle, Loader2, Image as ImageIcon, Search, LayoutDashboard, Database, FolderHeart, Sparkles, Trash2, Lock, LogOut, Pencil, X, PackageCheck, TrendingDown, BarChart3, Save, RefreshCw, Printer, PieChart, Menu, ChevronDown, ClipboardList } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { processPdfAction, scanLocalCatalogAction } from '@/app/actions/pdf';
 import { getAllProductsAction, uploadProductImageAction, createManualProductAction, deleteProductsAction, updateProductAction } from '@/app/actions/product';
@@ -28,7 +28,7 @@ export default function AdminPage() {
   const [pdfStatus, setPdfStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'import' | 'catalog' | 'categories' | 'estoque' | 'relatorio'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'import' | 'catalog' | 'categories' | 'estoque' | 'relatorio' | 'pedidos'>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Categories State
@@ -98,6 +98,18 @@ export default function AdminPage() {
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isDeletingItem, setIsDeletingItem] = useState<string | null>(null);
 
+  // Pedidos state
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [ordersSearch, setOrdersSearch] = useState('');
+  const [ordersDate, setOrdersDate] = useState('');
+  const [editOrder, setEditOrder] = useState<any | null>(null);
+  const [editCustomerName, setEditCustomerName] = useState('');
+  const [editCustomerPhone, setEditCustomerPhone] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editOrderStatus, setEditOrderStatus] = useState('PENDING');
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+
   // Top Categories Dashboard State
   const [topCategories, setTopCategories] = useState<any[]>([]);
   const [topCatPeriod, setTopCatPeriod] = useState<'alltime' | 'monthly' | 'weekly'>('alltime');
@@ -111,6 +123,70 @@ export default function AdminPage() {
       if (Array.isArray(data)) setTopCategories(data);
     } catch (e) { /* silent */ }
     setIsLoadingTopCat(false);
+  };
+
+  const fetchOrders = async (search = ordersSearch, date = ordersDate) => {
+    setIsLoadingOrders(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (date) params.set('date', date);
+      const res = await fetch(`/api/orders/list?${params}`);
+      const data = await res.json();
+      if (Array.isArray(data.orders)) setOrders(data.orders);
+    } catch (e) {}
+    setIsLoadingOrders(false);
+  };
+
+  const handlePrintOrder = (order: any) => {
+    const sep = '\u2500'.repeat(32);
+    const sepD = '\u2550'.repeat(32);
+    const d = new Date(order.createdAt);
+    const dateStr = d.toLocaleDateString('pt-BR');
+    const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const num = String(order._orderNum ?? '').padStart(5, '0');
+    const total = Number(order.totalAmount || 0).toFixed(2);
+    const rows = (order.items as any[]).map((it: any) => {
+      const t = ((it.price || 0) * it.quantity).toFixed(2);
+      return `<tr><td>${it.code}</td><td>${it.name}${it.customization ? ` (${it.customization})` : ''}</td><td style="text-align:center">${it.quantity}x</td><td style="text-align:right">R$${t}</td></tr>`;
+    }).join('');
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Pedido ${num}</title>
+<style>@page{size:80mm auto;margin:5mm}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:9.5pt;width:70mm;color:#000;line-height:1.4}.center{text-align:center}.bold{font-weight:bold}.sep{white-space:pre;overflow:hidden}h1{font-size:13pt;font-weight:bold;text-align:center;letter-spacing:1px}.sub{font-size:9pt;text-align:center}table{width:100%;border-collapse:collapse;margin-top:2px}td{padding:1px 2px;font-size:9pt;vertical-align:top}td:nth-child(1){width:18mm;font-size:8pt}td:nth-child(2){width:30mm}td:nth-child(3){width:7mm;text-align:center}td:nth-child(4){width:15mm;text-align:right}.tl{font-weight:bold;font-size:10.5pt}.obs{white-space:pre-wrap;word-break:break-word;font-size:9pt}.foot{text-align:center;margin-top:4px;font-size:8.5pt}</style>
+</head><body>
+<h1>SAGRADA FAM\u00cdLIA</h1><div class="sub">Artigos Religiosos</div>${order.sellerPhone ? `<div class="sub">Tel: ${order.sellerPhone}</div>` : ''}
+<div class="sep center">${sepD}</div>
+<div>PEDIDO N\u00ba <span class="bold">${num}</span> &nbsp; ${dateStr} ${timeStr}</div>
+<div class="sep">${sep}</div>
+<div>CLIENTE: <strong>${(order.customerName || '').toUpperCase()}</strong></div>${order.customerPhone ? `<div>TEL: ${order.customerPhone}</div>` : ''}
+<div class="sep">${sep}</div>
+<table><thead><tr><td><strong>C\u00d3D</strong></td><td><strong>DESCRI\u00c7\u00c3O</strong></td><td style="text-align:center"><strong>QT</strong></td><td style="text-align:right"><strong>TOTAL</strong></td></tr></thead>
+<tr><td colspan="4"><div class="sep">${sep}</div></td></tr>
+<tbody>${rows}</tbody>
+<tr><td colspan="4"><div class="sep">${sep}</div></td></tr>
+<tr class="tl"><td colspan="3" style="text-align:right">TOTAL:</td><td style="text-align:right">R$${total}</td></tr></table>
+${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</strong> ${order.notes}</div>` : ''}
+<div class="sep center">${sepD}</div><div class="foot">Obrigado pela prefer\u00eancia! \uD83D\uDE4F</div>
+</body></html>`;
+    const win = window.open('', '_blank', 'width=380,height=650');
+    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500); }
+  };
+
+  const handleSaveOrderEdit = async () => {
+    if (!editOrder) return;
+    setIsSavingOrder(true);
+    try {
+      const res = await fetch(`/api/orders/${editOrder.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerName: editCustomerName, customerPhone: editCustomerPhone, notes: editNotes, status: editOrderStatus }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o));
+        setEditOrder(null);
+      }
+    } catch (e) {}
+    setIsSavingOrder(false);
   };
 
   useEffect(() => {
@@ -641,12 +717,13 @@ export default function AdminPage() {
 
   // Tab labels map
   const TABS = [
-    { id: 'dashboard',  label: 'Geral',      icon: LayoutDashboard, action: () => setActiveTab('dashboard') },
-    { id: 'import',     label: 'Entrada',    icon: Database,        action: () => setActiveTab('import') },
-    { id: 'catalog',    label: 'Vitrine',    icon: FolderHeart,     action: () => setActiveTab('catalog') },
-    { id: 'categories', label: 'Grupos',     icon: Settings,        action: () => setActiveTab('categories') },
-    { id: 'estoque',    label: 'Estoque',    icon: PackageCheck,    action: () => { setActiveTab('estoque'); fetchStock(); } },
-    { id: 'relatorio',  label: 'Relatório',  icon: PieChart,        action: () => { setActiveTab('relatorio'); fetchDailyReport(reportDate); fetchTopCategories('alltime'); } },
+    { id: 'dashboard',  label: 'Geral',     icon: LayoutDashboard, action: () => setActiveTab('dashboard') },
+    { id: 'import',     label: 'Entrada',   icon: Database,        action: () => setActiveTab('import') },
+    { id: 'catalog',    label: 'Vitrine',   icon: FolderHeart,     action: () => setActiveTab('catalog') },
+    { id: 'categories', label: 'Grupos',    icon: Settings,        action: () => setActiveTab('categories') },
+    { id: 'estoque',    label: 'Estoque',   icon: PackageCheck,    action: () => { setActiveTab('estoque'); fetchStock(); } },
+    { id: 'relatorio',  label: 'Relatório', icon: PieChart,        action: () => { setActiveTab('relatorio'); fetchDailyReport(reportDate); fetchTopCategories('alltime'); } },
+    { id: 'pedidos',    label: 'Pedidos',   icon: ClipboardList,   action: () => { setActiveTab('pedidos'); fetchOrders(); } },
   ] as const;
 
   const activeTabLabel = TABS.find(t => t.id === activeTab)?.label ?? '';
@@ -715,31 +792,20 @@ export default function AdminPage() {
 
       {/* ── Mobile sticky bottom bar ── */}
       <nav className="fixed bottom-0 left-0 right-0 z-[150] md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-100 shadow-2xl flex items-center px-2 pb-safe h-16">
-        {TABS.slice(0, 5).map(tab => {
+        {TABS.slice(0, 4).map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
-            <button
-              key={tab.id}
-              onClick={() => tab.action()}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-all ${
-                isActive ? 'text-primary' : 'text-stone-400'
-              }`}
-            >
+            <button key={tab.id} onClick={() => tab.action()} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-all ${isActive ? 'text-primary' : 'text-stone-400'}`}>
               <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
               <span className="text-[9px] font-black uppercase tracking-wide">{tab.label}</span>
             </button>
           );
         })}
-        {/* More button — opens drawer */}
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-all ${
-            activeTab === 'relatorio' ? 'text-primary' : 'text-stone-400'
-          }`}
-        >
-          <PieChart size={20} strokeWidth={activeTab === 'relatorio' ? 2.5 : 1.8} />
-          <span className="text-[9px] font-black uppercase tracking-wide">Relatório</span>
+        {/* More button — opens full drawer */}
+        <button onClick={() => setIsMobileMenuOpen(true)} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-all ${['categories','estoque','relatorio','pedidos'].includes(activeTab) ? 'text-primary' : 'text-stone-400'}`}>
+          <Menu size={20} />
+          <span className="text-[9px] font-black uppercase tracking-wide">Mais</span>
         </button>
       </nav>
 
@@ -1803,6 +1869,134 @@ export default function AdminPage() {
             </motion.div>
           )}
 
+
+          {activeTab === 'pedidos' && (
+            <motion.div key="pedidos" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+
+              {/* Edit Order Modal */}
+              <AnimatePresence>
+                {editOrder && (
+                  <>
+                    <motion.div key="edit-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditOrder(null)} className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[300]" />
+                    <motion.div key="edit-modal" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[301] bg-white rounded-3xl shadow-2xl p-6 max-w-lg mx-auto">
+                      <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-lg font-black text-stone-800 uppercase tracking-tight">Editar Pedido</h2>
+                        <button onClick={() => setEditOrder(null)} className="p-2 bg-stone-100 rounded-xl text-stone-500 hover:text-stone-800"><X size={18} /></button>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2">Nome do Cliente</label>
+                          <input value={editCustomerName} onChange={e => setEditCustomerName(e.target.value)} className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-stone-800 outline-none focus:border-primary transition-all font-medium" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2">Telefone</label>
+                          <input value={editCustomerPhone} onChange={e => setEditCustomerPhone(e.target.value)} className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-stone-800 outline-none focus:border-primary transition-all font-medium" placeholder="(11) 99999-9999" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2">Status</label>
+                          <div className="flex gap-2">
+                            {[['PENDING','Pendente','bg-amber-100 text-amber-700 border-amber-200'],['CONFIRMED','Confirmado','bg-green-100 text-green-700 border-green-200'],['CANCELLED','Cancelado','bg-red-100 text-red-700 border-red-200']].map(([val, label, cls]) => (
+                              <button key={val} onClick={() => setEditOrderStatus(val)} className={`flex-1 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider transition-all ${editOrderStatus === val ? cls + ' shadow-sm scale-105' : 'bg-stone-50 border-stone-200 text-stone-400'}`}>{label}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2">Observações</label>
+                          <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={3} className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-stone-800 outline-none focus:border-primary transition-all font-medium resize-none" placeholder="Ex: Entregar na terça, embrulho para presente..." />
+                        </div>
+                      </div>
+                      <div className="flex gap-3 mt-6">
+                        <button onClick={() => setEditOrder(null)} className="flex-1 py-3 rounded-2xl border border-stone-200 text-stone-500 text-sm font-black uppercase tracking-wider hover:bg-stone-50 transition-all">Cancelar</button>
+                        <button onClick={handleSaveOrderEdit} disabled={isSavingOrder} className="flex-1 py-3 rounded-2xl bg-primary text-white text-sm font-black uppercase tracking-wider hover:bg-primary/90 transition-all shadow-lg shadow-primary/30 disabled:opacity-50 flex items-center justify-center gap-2">
+                          {isSavingOrder ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                          Salvar
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+
+              {/* Header */}
+              <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-5 border-b border-stone-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center"><ClipboardList size={20} className="text-primary" /></div>
+                    <div>
+                      <h2 className="text-lg font-black text-stone-800 uppercase tracking-tight">Pedidos</h2>
+                      <p className="text-xs text-stone-400 font-medium">{orders.length} pedido{orders.length !== 1 ? 's' : ''} carregado{orders.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <input type="date" value={ordersDate} onChange={e => { setOrdersDate(e.target.value); fetchOrders(ordersSearch, e.target.value); }} className="bg-stone-50 border border-stone-200 rounded-xl py-2 px-3 text-sm font-bold text-stone-700 outline-none focus:border-primary transition-all" />
+                    <div className="relative flex-1 sm:w-52">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                      <input type="text" placeholder="Buscar cliente..." value={ordersSearch} onChange={e => { setOrdersSearch(e.target.value); fetchOrders(e.target.value, ordersDate); }} className="w-full bg-stone-50 border border-stone-200 rounded-xl py-2 pl-8 pr-3 text-sm font-medium text-stone-700 outline-none focus:border-primary transition-all" />
+                    </div>
+                    <button onClick={() => fetchOrders()} className="p-2 rounded-xl bg-stone-50 border border-stone-200 text-stone-500 hover:text-primary transition-all"><RefreshCw size={16} /></button>
+                    {ordersDate && <button onClick={() => { setOrdersDate(''); fetchOrders(ordersSearch, ''); }} className="p-2 rounded-xl bg-stone-50 border border-stone-200 text-stone-500 hover:text-red-500 transition-all"><X size={16} /></button>}
+                  </div>
+                </div>
+
+                {isLoadingOrders ? (
+                  <div className="flex items-center justify-center py-16 gap-3 text-stone-400"><Loader2 size={24} className="animate-spin" /><span className="text-sm font-bold">Carregando pedidos...</span></div>
+                ) : orders.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-stone-400"><ClipboardList size={48} strokeWidth={1} className="opacity-30" /><p className="text-sm font-bold">Nenhum pedido encontrado.</p></div>
+                ) : (
+                  <div className="divide-y divide-stone-50">
+                    {orders.map((order: any) => {
+                      const d = new Date(order.createdAt);
+                      const dateStr = d.toLocaleDateString('pt-BR');
+                      const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                      const num = String(order._orderNum ?? '').padStart(5, '0');
+                      const total = Number(order.totalAmount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                      const statusCfg: Record<string, { label: string; cls: string }> = {
+                        PENDING:   { label: 'Pendente',  cls: 'bg-amber-100 text-amber-700' },
+                        CONFIRMED: { label: 'Confirmado',cls: 'bg-green-100 text-green-700' },
+                        CANCELLED: { label: 'Cancelado', cls: 'bg-red-100 text-red-700' },
+                      };
+                      const st = statusCfg[order.status] ?? { label: order.status, cls: 'bg-stone-100 text-stone-600' };
+                      return (
+                        <div key={order.id} className="px-6 py-4 hover:bg-stone-50/60 transition-colors">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className="text-[10px] font-black text-stone-400 font-mono">Nº {num}</span>
+                                <span className="text-[10px] font-bold text-stone-400">{dateStr} {timeStr}</span>
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${st.cls}`}>{st.label}</span>
+                              </div>
+                              <p className="font-black text-stone-800 text-sm truncate">{order.customerName}</p>
+                              {order.customerPhone && <p className="text-xs text-stone-400 font-medium">{order.customerPhone}</p>}
+                              {order.notes && <p className="text-xs text-primary/70 font-medium mt-0.5 italic truncate">OBS: {order.notes}</p>}
+                              <div className="flex items-center gap-3 mt-2">
+                                <span className="text-sm font-black text-stone-800">{total}</span>
+                                <span className="text-[10px] text-stone-400 font-bold">{(order.items as any[]).length} ite{(order.items as any[]).length !== 1 ? 'ns' : 'm'}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button onClick={() => { setEditOrder(order); setEditCustomerName(order.customerName || ''); setEditCustomerPhone(order.customerPhone || ''); setEditNotes(order.notes || ''); setEditOrderStatus(order.status || 'PENDING'); }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 text-stone-600 hover:bg-primary/10 hover:text-primary transition-all text-xs font-black uppercase tracking-wide">
+                                <Pencil size={13} /> <span className="hidden sm:inline">Editar</span>
+                              </button>
+                              <button onClick={() => handlePrintOrder(order)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-xs font-black uppercase tracking-wide">
+                                <Printer size={13} /> <span className="hidden sm:inline">Imprimir</span>
+                              </button>
+                            </div>
+                          </div>
+                          {/* Items preview */}
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {(order.items as any[]).slice(0, 4).map((it: any, i: number) => (
+                              <span key={i} className="text-[10px] bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full font-mono">{it.code} ×{it.quantity}</span>
+                            ))}
+                            {(order.items as any[]).length > 4 && <span className="text-[10px] text-stone-400 font-bold">+{(order.items as any[]).length - 4} mais</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {activeTab === 'categories' && (
             <motion.div

@@ -1,0 +1,128 @@
+===============================================================
+  PROJETO: SAGRADA FAMÍLIA - SISTEMA DE PEDIDOS
+  Gerado em: 2026-05-11 para retomada pós-reinstalação
+===============================================================
+
+## REPOSITÓRIO E DEPLOY
+- GitHub: https://github.com/VirtoozLopes/sagrada-familia
+- Deploy automático: Vercel (conectado ao GitHub, branch main)
+- Toda vez que você faz "git push", o site atualiza sozinho no Vercel
+
+## PASTA LOCAL DO PROJETO
+c:\Users\victo\Documents\pecas-order-system
+
+## TECNOLOGIAS
+- Next.js 14 (App Router)
+- Tailwind CSS + Framer Motion
+- Prisma ORM + PostgreSQL (banco remoto, configurado no .env)
+- Lucide React (ícones)
+- Hospedagem: Vercel
+
+## VARIÁVEIS DE AMBIENTE (.env)
+ATENÇÃO: esse arquivo NÃO vai pro GitHub por segurança.
+Ele fica em: c:\Users\victo\Documents\pecas-order-system\.env
+Ele contém: DATABASE_URL e outras chaves. Guarde ele em local seguro.
+Se mudar de computador, copie esse arquivo manualmente.
+
+===============================================================
+  O QUE FOI IMPLEMENTADO (histórico completo desta conversa)
+===============================================================
+
+1. MENU LATERAL (SIDEBAR) DE CATEGORIAS
+   - Substituímos o menu plano por uma sidebar retrátil com backdrop
+   - Suporte a categorias PAI e FILHAS (hierarquia)
+   - Ao clicar em uma categoria, o menu NÃO fecha (melhoria de UX)
+   - Fecha apenas ao clicar no X ou no backdrop
+   - Arquivo: src/app/page.tsx
+
+2. PAINEL ADMIN - ABA "RELATÓRIOS" (SEPARADA)
+   - Antes: relatório estava embutido na aba "Estoque"
+   - Agora: aba dedicada chamada "Relatório" com ícone PieChart
+   - Arquivo: src/app/admin/page.tsx
+
+3. DASHBOARD TOP 5 CATEGORIAS (dentro da aba Relatório)
+   - Barras animadas mostrando as 5 categorias mais vendidas
+   - Filtros de período: "Sempre", "Este Mês", "Esta Semana"
+   - Mostra volume em peças e receita por categoria
+   - Nova API criada: src/app/api/reports/top-categories/route.ts
+
+4. RELATÓRIO DE VENDAS (movido para a aba Relatório)
+   - Filtros: Diário / Semanal + seletor de data
+   - Resumo: total de pedidos, peças vendidas, receita total
+   - Tabela detalhada com código, nome, qtd, preço, subtotal, estoque
+   - Botão exportar PDF / imprimir
+
+5. ADMIN RESPONSIVO PARA CELULAR
+   - Antes: 6 abas horizontais cortavam a tela no celular
+   - Agora (mobile): barra de navegação fixa na PARTE INFERIOR da tela
+     * 5 abas visíveis com ícone + nome
+     * "Relatório" abre um DRAWER (gaveta) deslizante de baixo para cima
+     * Drawer tem grid 3x2 com todas as abas + botão Sair
+   - Desktop: mantém a pill nav horizontal original
+   - Arquivo: src/app/admin/page.tsx
+
+6. INFRAESTRUTURA / DEPLOY
+   - Repositório conectado ao GitHub
+   - Deploy automático no Vercel configurado
+   - Limpeza de histórico Git feita (tokens expostos removidos)
+   - Arquivos fix_admin.ps1, git-push.bat e set-vercel-env.js
+     foram REMOVIDOS do tracking do git (tinham credenciais)
+
+7. CORREÇÕES DE BUILD VERCEL
+   - Adicionado "export const dynamic = 'force-dynamic'" nas rotas:
+     * src/app/api/reports/daily/route.ts
+     * src/app/api/reports/daily/item/route.ts
+     * src/app/api/reports/top-categories/route.ts
+
+===============================================================
+  ESTADO ATUAL DO PROJETO (como está hoje)
+===============================================================
+
+- Site funcionando em produção no Vercel ✅
+- Build local passando sem erros ✅
+- Mobile responsivo no admin ✅
+- Sidebar de categorias funcionando ✅
+- Relatórios e dashboards funcionando ✅
+
+===============================================================
+  ARQUIVOS CRÍTICOS DO PROJETO
+===============================================================
+
+src/app/page.tsx              → Página principal (catálogo + sidebar)
+src/app/admin/page.tsx        → Painel admin completo (1800+ linhas)
+src/app/api/reports/
+  daily/route.ts              → API relatório diário/semanal
+  top-categories/route.ts     → API top 5 categorias (nova)
+src/app/api/categories/       → API de categorias hierárquicas
+src/app/api/products/         → APIs de produtos
+prisma/schema.prisma          → Estrutura do banco de dados
+src/app/globals.css           → Estilos globais + variável --primary
+
+===============================================================
+  PENDÊNCIAS / IDEIAS PARA O FUTURO
+===============================================================
+
+- WhatsApp Business API: permitiria enviar pedido SEM o usuário
+  precisar confirmar, mas requer conta Meta Business e tem custo.
+  Com o link wa.me atual, a confirmação manual é obrigatória.
+
+- Multi-tenant: para vender o sistema para múltiplos clientes,
+  precisaria refatorar para multi-tenant (um código, vários clientes)
+
+- Pagamento online: integração com Pix/cartão não implementada
+
+- App nativo: o sistema é web (PWA), não tem app na loja
+
+===============================================================
+  COMO RETOMAR EM NOVA CONVERSA
+===============================================================
+
+1. Abra o projeto: c:\Users\victo\Documents\pecas-order-system
+2. Cole o conteúdo deste arquivo para o Antigravity
+3. Diga o que quer fazer e o AI vai ler os arquivos do projeto
+   para se situar rapidamente
+
+DICA: O código no GitHub está sempre atualizado com a última
+versão. Em outro computador: git clone + npm install + copiar .env
+
+===============================================================
