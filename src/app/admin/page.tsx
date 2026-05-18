@@ -7,6 +7,7 @@ import { processPdfAction, scanLocalCatalogAction } from '@/app/actions/pdf';
 import { getAllProductsAction, uploadProductImageAction, createManualProductAction, deleteProductsAction, updateProductAction } from '@/app/actions/product';
 import { getWhatsAppNumbersAction, saveWhatsAppNumbersAction } from '@/app/actions/settings';
 import { changePasswordAction, logoutAction } from '@/app/actions/auth';
+import { TENANT } from '@/lib/tenant';
 
 interface Product {
   id: string;
@@ -110,6 +111,9 @@ export default function AdminPage() {
   const [editOrderStatus, setEditOrderStatus] = useState('PENDING');
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [isDeletingOrder, setIsDeletingOrder] = useState<string | null>(null);
+  const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
+  const [editItemSearch, setEditItemSearch] = useState('');
+  const [showAddItem, setShowAddItem] = useState(false);
 
   // Top Categories Dashboard State
   const [topCategories, setTopCategories] = useState<any[]>([]);
@@ -154,7 +158,7 @@ export default function AdminPage() {
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Pedido ${num}</title>
 <style>@page{size:80mm auto;margin:5mm}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:9.5pt;width:70mm;color:#000;line-height:1.4}.center{text-align:center}.bold{font-weight:bold}.sep{white-space:pre;overflow:hidden}h1{font-size:13pt;font-weight:bold;text-align:center;letter-spacing:1px}.sub{font-size:9pt;text-align:center}table{width:100%;border-collapse:collapse;margin-top:2px}td{padding:1px 2px;font-size:9pt;vertical-align:top}td:nth-child(1){width:18mm;font-size:8pt}td:nth-child(2){width:30mm}td:nth-child(3){width:7mm;text-align:center}td:nth-child(4){width:15mm;text-align:right}.tl{font-weight:bold;font-size:10.5pt}.obs{white-space:pre-wrap;word-break:break-word;font-size:9pt}.foot{text-align:center;margin-top:4px;font-size:8.5pt}</style>
 </head><body>
-<h1>SAGRADA FAM\u00cdLIA</h1><div class="sub">Artigos Religiosos</div>${order.sellerPhone ? `<div class="sub">Tel: ${order.sellerPhone}</div>` : ''}
+<h1>${TENANT.storeName.toUpperCase()}</h1><div class="sub">${TENANT.storeSubtitle}</div>${order.sellerPhone ? `<div class="sub">Tel: ${order.sellerPhone}</div>` : ''}
 <div class="sep center">${sepD}</div>
 <div>PEDIDO N\u00ba <span class="bold">${num}</span> &nbsp; ${dateStr} ${timeStr}</div>
 <div class="sep">${sep}</div>
@@ -166,7 +170,7 @@ export default function AdminPage() {
 <tr><td colspan="4"><div class="sep">${sep}</div></td></tr>
 <tr class="tl"><td colspan="3" style="text-align:right">TOTAL:</td><td style="text-align:right">R$${total}</td></tr></table>
 ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</strong> ${order.notes}</div>` : ''}
-<div class="sep center">${sepD}</div><div class="foot">Obrigado pela prefer\u00eancia! \uD83D\uDE4F</div>
+<div class="sep center">${sepD}</div><div class="foot">${TENANT.orderThanksMessage}</div>
 </body></html>`;
     const win = window.open('', '_blank', 'width=380,height=650');
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500); }
@@ -179,7 +183,7 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
       const res = await fetch(`/api/orders/${editOrder.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerName: editCustomerName, customerPhone: editCustomerPhone, notes: editNotes, status: editOrderStatus }),
+        body: JSON.stringify({ customerName: editCustomerName, customerPhone: editCustomerPhone, notes: editNotes, status: editOrderStatus, items: editOrderItems }),
       });
       if (res.ok) {
         const updated = await res.json();
@@ -474,7 +478,7 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
 <body>
   <div class="header">
     <div>
-      <div class="brand">Pecas Order System</div>
+      <div class="brand">${TENANT.reportBrand}</div>
       <h1>Relatório de Vendas</h1>
       <div class="subtitle">${dateLabel}</div>
       <div class="meta">Gerado em ${now}</div>
@@ -515,7 +519,7 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
   </table>
 
   <div class="footer">
-    <span>Pecas Order System – Relatório interno</span>
+    <span>${TENANT.reportBrand} – Relatório interno</span>
     <span>${dateLabel} · ${now}</span>
   </div>
 
@@ -841,7 +845,7 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
           {/* Mobile header */}
           <div className="flex items-center justify-between md:hidden">
             <div>
-              <h1 className="text-xl font-black text-gradient tracking-tight leading-tight">GESTÃO SAGRADA FAMÍLIA</h1>
+              <h1 className="text-xl font-black text-gradient tracking-tight leading-tight">GESTÃO {TENANT.storeName.toUpperCase()}</h1>
               <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">{activeTabLabel}</p>
             </div>
             <button
@@ -855,8 +859,8 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
           {/* Desktop header */}
           <div className="hidden md:flex md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h1 className="text-4xl font-black text-gradient tracking-tight">GESTÃO SAGRADA FAMÍLIA</h1>
-              <p className="text-stone-500 mt-1">Gerencie seu inventário de artigos religiosos com facilidade.</p>
+              <h1 className="text-4xl font-black text-gradient tracking-tight">GESTÃO {TENANT.storeName.toUpperCase()}</h1>
+              <p className="text-stone-500 mt-1">Gerencie seu inventário de {TENANT.storeSubtitle.toLowerCase()} com facilidade.</p>
             </div>
             <div className="flex items-center gap-4">
               <nav className="flex p-1.5 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-2xl shadow-sm">
@@ -1948,6 +1952,52 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
                           <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2">Observações</label>
                           <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={3} className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-stone-800 outline-none focus:border-primary transition-all font-medium resize-none" placeholder="Ex: Entregar na terça, embrulho para presente..." />
                         </div>
+
+                        {/* Itens do Pedido */}
+                        <div>
+                          <label className="block text-[10px] font-black text-stone-500 uppercase tracking-widest mb-3">Itens do Pedido</label>
+                          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                            {editOrderItems.map((item: any, idx: number) => (
+                              <div key={idx} className="flex items-center gap-2 bg-stone-50 rounded-xl px-3 py-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[10px] font-black text-stone-400 uppercase">{item.code}</p>
+                                  <p className="text-xs font-bold text-stone-700 truncate">{item.name}{item.customization ? ` (${item.customization})` : ''}</p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button onClick={() => { const n=[...editOrderItems]; n[idx]={...n[idx],quantity:Math.max(1,(n[idx].quantity||1)-1)}; setEditOrderItems(n); }} className="w-6 h-6 rounded-lg bg-stone-200 text-stone-600 font-black flex items-center justify-center hover:bg-stone-300 transition-all">−</button>
+                                  <input type="number" min="1" value={item.quantity} onChange={e => { const n=[...editOrderItems]; n[idx]={...n[idx],quantity:Math.max(1,parseInt(e.target.value)||1)}; setEditOrderItems(n); }} className="w-12 text-center bg-white border border-stone-200 rounded-lg py-1 text-xs font-black text-stone-800 outline-none focus:border-primary" />
+                                  <button onClick={() => { const n=[...editOrderItems]; n[idx]={...n[idx],quantity:(n[idx].quantity||1)+1}; setEditOrderItems(n); }} className="w-6 h-6 rounded-lg bg-stone-200 text-stone-600 font-black flex items-center justify-center hover:bg-stone-300 transition-all">+</button>
+                                </div>
+                                <span className="text-xs font-bold text-stone-600 w-16 text-right shrink-0">R${((item.price||0)*(item.quantity||1)).toFixed(2)}</span>
+                                <button onClick={() => setEditOrderItems(prev => prev.filter((_,i) => i !== idx))} className="w-6 h-6 rounded-lg bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center text-xs font-black">×</button>
+                              </div>
+                            ))}
+                            {editOrderItems.length === 0 && <p className="text-xs text-stone-400 text-center py-4">Nenhum item</p>}
+                          </div>
+
+                          <div className="flex justify-between items-center mt-3 pt-3 border-t border-stone-100">
+                            <span className="text-xs text-stone-400 font-bold uppercase tracking-wider">Total</span>
+                            <span className="text-base font-black text-stone-800">R${editOrderItems.reduce((s: number, i: any) => s + (i.price||0)*(i.quantity||1), 0).toFixed(2)}</span>
+                          </div>
+
+                          {!showAddItem ? (
+                            <button onClick={() => setShowAddItem(true)} className="mt-3 w-full py-2.5 rounded-xl border border-dashed border-stone-300 text-stone-400 text-xs font-black uppercase tracking-wider hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2"><span className="text-base leading-none">+</span> Adicionar produto</button>
+                          ) : (
+                            <div className="mt-3 bg-stone-50 rounded-2xl p-3">
+                              <input autoFocus type="text" placeholder="Buscar por código ou nome..." value={editItemSearch} onChange={e => setEditItemSearch(e.target.value)} className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3 text-xs font-medium text-stone-800 outline-none focus:border-primary transition-all" />
+                              <div className="mt-2 max-h-36 overflow-y-auto space-y-1">
+                                {products.filter((p: any) => (p.code?.toLowerCase()||"").includes(editItemSearch.toLowerCase()) || (p.name?.toLowerCase()||"").includes(editItemSearch.toLowerCase())).slice(0,8).map((p: any) => (
+                                  <button key={p.id} onClick={() => { setEditOrderItems(prev => [...prev, {productId:p.id,code:p.code,name:p.name,quantity:1,price:p.price||0}]); setEditItemSearch(''); setShowAddItem(false); }} className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all text-left">
+                                    <div><p className="text-[10px] font-black text-stone-400">{p.code}</p><p className="text-xs font-bold text-stone-700">{p.name}</p></div>
+                                    <span className="text-xs font-black text-primary">R${(p.price||0).toFixed(2)}</span>
+                                  </button>
+                                ))}
+                                {products.filter((p: any) => (p.code?.toLowerCase()||"").includes(editItemSearch.toLowerCase()) || (p.name?.toLowerCase()||"").includes(editItemSearch.toLowerCase())).length === 0 && editItemSearch.length > 0 && <p className="text-xs text-stone-400 text-center py-2">Nenhum produto encontrado</p>}
+                              </div>
+                              <button onClick={() => { setShowAddItem(false); setEditItemSearch(''); }} className="mt-2 w-full py-1.5 text-[10px] font-black text-stone-400 uppercase tracking-wider hover:text-stone-600 transition-all">Cancelar</button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-3 mt-6">
                         <button onClick={() => setEditOrder(null)} className="flex-1 py-3 rounded-2xl border border-stone-200 text-stone-500 text-sm font-black uppercase tracking-wider hover:bg-stone-50 transition-all">Cancelar</button>
@@ -2019,7 +2069,7 @@ ${order.notes ? `<div class="sep">${sep}</div><div class="obs"><strong>OBS:</str
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <button
-                                onClick={() => { setEditOrder(order); setEditCustomerName(order.customerName || ''); setEditCustomerPhone(order.customerPhone || ''); setEditNotes(order.notes || ''); setEditOrderStatus(order.status || 'PENDING'); }}
+                                onClick={() => { setEditOrder(order); setEditCustomerName(order.customerName || ''); setEditCustomerPhone(order.customerPhone || ''); setEditNotes(order.notes || ''); setEditOrderStatus(order.status || 'PENDING'); setEditOrderItems(order.items ? order.items.map((i: any) => ({...i})) : []); setEditItemSearch(''); setShowAddItem(false); }}
                                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 text-stone-600 hover:bg-primary/10 hover:text-primary transition-all text-xs font-black uppercase tracking-wide">
                                 <Pencil size={13} /> <span className="hidden sm:inline">Editar</span>
                               </button>

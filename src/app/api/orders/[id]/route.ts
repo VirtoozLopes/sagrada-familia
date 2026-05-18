@@ -24,15 +24,39 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { customerName, customerPhone, notes, status } = body;
+    const { customerName, customerPhone, notes, status, items } = body;
+
+    // If items are provided, replace all OrderItems atomically
+    let newTotalAmount: number | undefined;
+    if (Array.isArray(items)) {
+      await prisma.orderItem.deleteMany({ where: { orderId: params.id } });
+      if (items.length > 0) {
+        await prisma.orderItem.createMany({
+          data: items.map((item: any) => ({
+            orderId: params.id,
+            productId: item.productId || item.id || '',
+            code: item.code,
+            name: item.name,
+            quantity: Math.max(1, Number(item.quantity) || 1),
+            price: Number(item.price) || 0,
+            customization: item.customization || null,
+          })),
+        });
+      }
+      newTotalAmount = items.reduce(
+        (sum: number, item: any) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 1),
+        0
+      );
+    }
 
     const updated = await prisma.order.update({
       where: { id: params.id },
       data: {
-        ...(customerName  !== undefined && { customerName }),
-        ...(customerPhone !== undefined && { customerPhone }),
-        ...(notes         !== undefined && { notes }),
-        ...(status        !== undefined && { status }),
+        ...(customerName   !== undefined && { customerName }),
+        ...(customerPhone  !== undefined && { customerPhone }),
+        ...(notes          !== undefined && { notes }),
+        ...(status         !== undefined && { status }),
+        ...(newTotalAmount !== undefined && { totalAmount: newTotalAmount }),
       },
       include: { items: true },
     });
